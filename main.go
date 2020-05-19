@@ -1,9 +1,10 @@
 package main
 
 import (
+	"fmt"
 	bencode "github.com/jackpal/bencode-go"
+	"io/ioutil"
 	"log"
-	//"net/url"
 	"os"
 )
 
@@ -16,5 +17,14 @@ func main() {
 	torrent := TorrentInfo{}
 	err = bencode.Unmarshal(f, &torrent)
 
-	torrent.NewTracker()
+	tr, err := torrent.NewTracker()
+	resp, err := tr.getReq()
+	if err != nil {
+		fmt.Println(err)
+	} else {
+		fmt.Println("We made it")
+		defer resp.Body.Close()
+		body, _ := ioutil.ReadAll(resp.Body)
+		fmt.Println(string(body))
+	}
 }

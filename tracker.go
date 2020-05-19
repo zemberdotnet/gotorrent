@@ -7,11 +7,13 @@ import (
 	"fmt"
 	bencode "github.com/jackpal/bencode-go"
 	"log"
+	"net/http"
 )
 
 // Should there be multiple levels to this, would it make the code better, easier to read
 // Types in this request
 type TrackReq struct {
+	Announce string
 	InfoHash string
 	PeerId   string
 	Port     string
@@ -39,12 +41,23 @@ func urlHash(h [20]byte) (urlEncodedHash string) {
 }
 
 // Maybe needs to take in some parameters
-func (t TorrentInfo) NewTracker() (err error) {
+func (t TorrentInfo) NewTracker() (tr TrackReq, err error) {
 	// Function body should create a new tracking request
 
 	hash := t.Info.hash()
 	// How to eliminate this kind of thing
-	urlHash := urlHash(hash)
-	fmt.Println(urlHash)
-	return nil
+	urlH := urlHash(hash)
+	fmt.Println(urlH)
+
+	s := "unique string"
+	peerid := urlHash(sha1.Sum([]byte(s)))
+
+	return TrackReq{
+		Announce: t.Announce,
+		InfoHash: urlH,
+		PeerId:   peerid,
+	}, nil
+}
+func (t TrackReq) getReq() (resp *http.Response, err error) {
+	return http.Get(t.Announce + "?info_hash=" + t.InfoHash + "&peer_id=" + t.PeerId)
 }
