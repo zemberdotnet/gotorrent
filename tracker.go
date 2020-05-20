@@ -21,6 +21,24 @@ type TrackReq struct {
 	Down     string
 }
 
+type TrackResp struct {
+	Failure    string `bencode:"failure reason"`
+	Warning    string `bencode:"warning message"`
+	Interval   string `bencode:"interval"`
+	MinInter   string `bencode:"min interval"`
+	TrackerId  string `bencode:"tracker id"`
+	Complete   int    `bencode:"complete"` //seeders
+	Incomplete int    `bencode:"incomplete"`
+	Peers      []Peer `bencode:"peers"`
+}
+
+// Need an array of Peers
+type Peer struct {
+	PeerId string `bencode:"peer id"`
+	IP     string `bencode:"ip"`
+	Port   string `bencode:"port"`
+}
+
 func (i InfoDict) hash() (hsum [20]byte) {
 	var buf bytes.Buffer
 
@@ -61,3 +79,9 @@ func (t TorrentInfo) NewTracker() (tr TrackReq, err error) {
 func (t TrackReq) getReq() (resp *http.Response, err error) {
 	return http.Get(t.Announce + "?info_hash=" + t.InfoHash + "&peer_id=" + t.PeerId)
 }
+
+/*
+WIP PARSE THE RESPONSE
+func parseReponse(resp *http.Response) TrackResp {
+	resp.Body()
+*/
