@@ -22,9 +22,14 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 	} else {
-		fmt.Println("We made it")
 		defer resp.Body.Close()
-		body, _ := ioutil.ReadAll(resp.Body)
+		//fmt.Println(reflect.TypeOf(resp.Body).String())
+		body, err := ioutil.ReadAll(resp.Body)
 		fmt.Println(string(body))
+		if err != nil {
+			log.Fatal(err)
+		}
+		tResp := parseResponse(resp.Body)
+		fmt.Println(tResp)
 	}
 }

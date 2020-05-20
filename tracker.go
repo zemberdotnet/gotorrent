@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	bencode "github.com/jackpal/bencode-go"
+	"io"
 	"log"
 	"net/http"
 )
@@ -24,7 +25,7 @@ type TrackReq struct {
 type TrackResp struct {
 	Failure    string `bencode:"failure reason"`
 	Warning    string `bencode:"warning message"`
-	Interval   string `bencode:"interval"`
+	Interval   int    `bencode:"interval"`
 	MinInter   string `bencode:"min interval"`
 	TrackerId  string `bencode:"tracker id"`
 	Complete   int    `bencode:"complete"` //seeders
@@ -36,7 +37,7 @@ type TrackResp struct {
 type Peer struct {
 	PeerId string `bencode:"peer id"`
 	IP     string `bencode:"ip"`
-	Port   string `bencode:"port"`
+	Port   int    `bencode:"port"`
 }
 
 func (i InfoDict) hash() (hsum [20]byte) {
@@ -58,6 +59,7 @@ func urlHash(h [20]byte) (urlEncodedHash string) {
 	return s
 }
 
+// We have to come back and fix this hard coding
 // Maybe needs to take in some parameters
 func (t TorrentInfo) NewTracker() (tr TrackReq, err error) {
 	// Function body should create a new tracking request
@@ -80,8 +82,13 @@ func (t TrackReq) getReq() (resp *http.Response, err error) {
 	return http.Get(t.Announce + "?info_hash=" + t.InfoHash + "&peer_id=" + t.PeerId)
 }
 
-/*
-WIP PARSE THE RESPONSE
-func parseReponse(resp *http.Response) TrackResp {
-	resp.Body()
-*/
+//WIP PARSE THE RESPONSE
+func parseResponse(r io.ReadCloser) TrackResp {
+	tr := TrackResp{}
+
+	err := bencode.Unmarshal(r, &tr)
+	if err != nil {
+		fmt.Println(err)
+	}
+	return tr
+}
