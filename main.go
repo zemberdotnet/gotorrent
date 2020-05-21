@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	bencode "github.com/jackpal/bencode-go"
-	"io/ioutil"
+	//	"io/ioutil"
 	"log"
 	"os"
 )
@@ -22,18 +22,25 @@ func main() {
 	resp, err := tr.getReq()
 	if err != nil {
 		fmt.Println(err)
-	} else {
-		defer resp.Body.Close()
-
-		//fmt.Println(reflect.TypeOf(resp.Body).String())
-
-		body, err := ioutil.ReadAll(resp.Body)
-
-		fmt.Println(string(body))
-		if err != nil {
-			log.Fatal(err)
-		}
-		tResp, err := parseResponse(resp.Body)
-		fmt.Println(tResp)
+		return
 	}
+	defer resp.Body.Close()
+
+	//fmt.Println(reflect.TypeOf(resp.Body).String())
+
+	//	body, err := ioutil.ReadAll(resp.Body)
+
+	//	fmt.Println(string(body))
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	tResp, err := parseResponse(resp.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(tResp)
+
+	conn := peerConn(tResp.Peers[0])
+	defer conn.Close()
+	fmt.Println(conn)
 }

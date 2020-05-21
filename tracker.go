@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	bencode "github.com/jackpal/bencode-go"
+	"io"
 	"log"
 	"net/http"
 )
@@ -36,8 +37,9 @@ type TrackResp struct {
 // Need an array of Peers
 type Peer struct {
 	//	PeerId string `bencode:"peer id"`
-	IP   string `bencode:"ip"`
-	Port uint16 `bencode:"port"`
+	IP string `bencode:"ip"`
+	// Going to try with just regular ints, could go wrong but w/e
+	Port int `bencode:"port"`
 }
 
 func (i InfoDict) hash() (hsum [20]byte) {
@@ -82,7 +84,7 @@ func (t TrackReq) getReq() (resp *http.Response, err error) {
 	return http.Get(t.Announce + "?info_hash=" + t.InfoHash + "&peer_id=" + t.PeerId)
 }
 
-func parseResponse(r io.ReadCloser) (t TrackResp, err error) {
+func parseResponse(r io.ReadCloser) (t TrackResp, e error) {
 	tr := TrackResp{}
 	tr.Failure = "nil"
 	err := bencode.Unmarshal(r, &tr)
