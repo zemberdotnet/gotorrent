@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	bencode "github.com/jackpal/bencode-go"
-	"io"
 	"log"
 	"net/http"
 )
@@ -23,21 +23,21 @@ type TrackReq struct {
 }
 
 type TrackResp struct {
-	Failure    string `bencode:"failure reason"`
-	Warning    string `bencode:"warning message"`
-	Interval   int    `bencode:"interval"`
-	MinInter   string `bencode:"min interval"`
-	TrackerId  string `bencode:"tracker id"`
-	Complete   int    `bencode:"complete"` //seeders
-	Incomplete int    `bencode:"incomplete"`
-	Peers      []Peer `bencode:"peers"`
+	Failure string `bencode:"failure reason"`
+	//Warning    string `bencode:"warning message"`
+	Interval int `bencode:"interval"`
+	//MinInter   string `bencode:"min interval"`
+	//TrackerId  string `bencode:"tracker id"`
+	//Complete   int    `bencode:"complete"` //seeders
+	//Incomplete int    `bencode:"incomplete"`
+	Peers []Peer `bencode:"peers"`
 }
 
 // Need an array of Peers
 type Peer struct {
-	PeerId string `bencode:"peer id"`
-	IP     string `bencode:"ip"`
-	Port   int    `bencode:"port"`
+	//	PeerId string `bencode:"peer id"`
+	IP   string `bencode:"ip"`
+	Port uint16 `bencode:"port"`
 }
 
 func (i InfoDict) hash() (hsum [20]byte) {
@@ -82,13 +82,15 @@ func (t TrackReq) getReq() (resp *http.Response, err error) {
 	return http.Get(t.Announce + "?info_hash=" + t.InfoHash + "&peer_id=" + t.PeerId)
 }
 
-//WIP PARSE THE RESPONSE
-func parseResponse(r io.ReadCloser) TrackResp {
+func parseResponse(r io.ReadCloser) (t TrackResp, err error) {
 	tr := TrackResp{}
-
+	tr.Failure = "nil"
 	err := bencode.Unmarshal(r, &tr)
 	if err != nil {
-		fmt.Println(err)
+		return tr, err
 	}
-	return tr
+	if tr.Failure != "nil" {
+		return tr, errors.New(tr.Failure)
+	}
+	return tr, nil
 }

@@ -18,18 +18,22 @@ func main() {
 	err = bencode.Unmarshal(f, &torrent)
 
 	tr, err := torrent.NewTracker()
+
 	resp, err := tr.getReq()
 	if err != nil {
 		fmt.Println(err)
 	} else {
 		defer resp.Body.Close()
+
 		//fmt.Println(reflect.TypeOf(resp.Body).String())
+
 		body, err := ioutil.ReadAll(resp.Body)
+
 		fmt.Println(string(body))
 		if err != nil {
 			log.Fatal(err)
 		}
-		tResp := parseResponse(resp.Body)
+		tResp, err := parseResponse(resp.Body)
 		fmt.Println(tResp)
 	}
 }
