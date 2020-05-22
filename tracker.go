@@ -12,8 +12,9 @@ import (
 	"net/http"
 )
 
-// Should there be multiple levels to this, would it make the code better, easier to read
-// Types in this request
+// TrackReq represents parameters needed to send a request to the tracker
+// Values are encoded as strings, but it would probably be better to move these to
+// bytes in a future version.
 type TrackReq struct {
 	Announce string
 	InfoHash string
@@ -23,6 +24,8 @@ type TrackReq struct {
 	Down     string
 }
 
+// TrackResp represents a response from the Tracker.
+// NOTE: Currently commented values are optional. Future updates should reconsile these
 type TrackResp struct {
 	Failure string `bencode:"failure reason"`
 	//Warning    string `bencode:"warning message"`
@@ -34,7 +37,10 @@ type TrackResp struct {
 	Peers []Peer `bencode:"peers"`
 }
 
-// Need an array of Peers
+// Peer represents a single peer from the peers key in the tracker response.
+// A peer consists of an IP and a Port.
+// NOTE: bencode passes back the port as a int and IP as a string. In the future,
+// moving to big endian (unit16) and net.IP might improve things a bit
 type Peer struct {
 	//	PeerId string `bencode:"peer id"`
 	IP string `bencode:"ip"`
@@ -42,6 +48,8 @@ type Peer struct {
 	Port int `bencode:"port"`
 }
 
+// hash computes the sha1 sum of the bencode formatted info key.
+// We re-marshal the infodict and use the bytes to compute a [20]byte hash sum.
 func (i InfoDict) hash() (hsum [20]byte) {
 	var buf bytes.Buffer
 
@@ -52,9 +60,11 @@ func (i InfoDict) hash() (hsum [20]byte) {
 	return sha1.Sum(buf.Bytes())
 }
 
+// urlHash takes a sha1 Sum ([20]bytes) and returns a string formatted in the
+// url escape sequence
 func urlHash(h [20]byte) (urlEncodedHash string) {
 	s := ""
-	for i, _ := range h {
+	for i := range h {
 		u := hex.EncodeToString(h[i : i+1])
 		s += "%" + u
 	}
@@ -80,6 +90,9 @@ func (t TorrentInfo) NewTracker() (tr TrackReq, err error) {
 		PeerId:   peerid,
 	}, nil
 }
+
+// getReq sends the tracker request to the tracker.
+// NOTE: I would like to rename this function & possibly change how parameters are used in the query
 func (t TrackReq) getReq() (resp *http.Response, err error) {
 	return http.Get(t.Announce + "?info_hash=" + t.InfoHash + "&peer_id=" + t.PeerId)
 }
