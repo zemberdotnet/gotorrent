@@ -53,12 +53,20 @@ func main() {
 		break
 	}
 	defer conn.Close()
-	fmt.Fprint(conn, hbytes)
-	m, err := ReadMessage(conn)
+	n, err := conn.Write(hbytes)
+	//n, err := fmt.Fprint(conn, hbytes)
+	fmt.Println(n)
+	if err != nil {
+		fmt.Println(err)
+	}
+	h, err := ReadHandshake(conn)
+
 	if err != nil && err != io.EOF {
 		fmt.Println(err)
 	}
-	fmt.Println(m)
+	fmt.Println("PSTR", h.Pstr)
+	fmt.Println("InfoHash", h.InfoHash)
+	fmt.Println("PeerID", h.PeerId)
 	/*
 		for {
 			n, err := conn.Read(tmp)

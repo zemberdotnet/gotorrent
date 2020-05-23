@@ -11,10 +11,9 @@ import (
 )
 
 type Handshake struct {
-	Pstr     []byte
-	Reserved []byte
-	InfoHash []byte
-	PeerId   []byte
+	Pstr     string
+	InfoHash [20]byte
+	PeerId   [20]byte
 }
 
 // Probably bad to handle error handling here and not elevate it
@@ -40,11 +39,11 @@ func peerString(peer Peer) string {
 func (t *TorrentInfo) newHandshake() (h *Handshake) {
 	ih := t.Info.hash()
 	pd := sha1.Sum([]byte("unique string"))
+	fmt.Println("HASH:", ih)
 	handshake := Handshake{
-		Pstr:     []byte("BitTorrent protocol"),
-		Reserved: []byte("00000000"),
-		InfoHash: ih[:],
-		PeerId:   pd[:],
+		Pstr:     "BitTorrent protocol",
+		InfoHash: ih,
+		PeerId:   pd,
 	}
 	return &handshake
 }
@@ -55,9 +54,11 @@ func (h *Handshake) Serialize() []byte {
 	buf[0] = byte(len(h.Pstr))
 	index := 1
 	index += copy(buf[index:], h.Pstr)
-	index += copy(buf[index:], h.Reserved)
+	index += copy(buf[index:], make([]byte, 8))
 	index += copy(buf[index:], h.InfoHash[:])
 	index += copy(buf[index:], h.PeerId[:])
+	fmt.Println("Serial Handshake: ", buf)
+	fmt.Println("LEN HADNSHEK:", len(buf))
 	return buf
 }
 
@@ -68,23 +69,22 @@ func ReadHandshake(r io.Reader) (*Handshake, error) {
 		return nil, err
 	}
 	pstrlen := int(lengthBuf[0])
+	fmt.Println("LEN:", pstrlen)
 	if pstrlen == 0 {
 		err := fmt.Errorf("pstrlen cannot be 0")
 		return nil, err
 	}
-
+	// Should be 48 moved to the whole for now
 	handshakeBuf := make([]byte, 48+pstrlen)
-	_, err := io.ReadFull(r, handshakeBuf)
+	_, err = io.ReadFull(r, handshakeBuf)
 	if err != nil {
 		return nil, err
 	}
-
 	var infoHash, peerID [20]byte
 	copy(infoHash[:], handshakeBuf[pstrlen+8:pstrlen+8+20])
 	copy(peerID[:], handshakeBuf[pstrlen+8+20:])
-
 	h := Handshake{
-		Pstr:     (handshakeBuf[0:pstrlen]),
+		Pstr:     string(handshakeBuf[0:pstrlen]),
 		InfoHash: infoHash,
 		PeerId:   peerID,
 	}
