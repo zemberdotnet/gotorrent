@@ -1,8 +1,7 @@
 package client
 
 import (
-	"fmt"
-	"github.com/zemberdotnet/gotorrent/handshake"
+	"github.com/zemberdotnet/gotorrent/peer"
 	"github.com/zemberdotnet/gotorrent/torrent"
 	"github.com/zemberdotnet/gotorrent/tracker"
 	"log"
@@ -10,58 +9,30 @@ import (
 )
 
 type Client struct {
-	InputPath  string
-	OutputPath string
-	InfoHash   [20]byte
-	PeerID     [20]byte
+	MetaInfo *torrent.MetaInfo
+	Peers    *[]peer.Peer
 }
 
-func New(inputPath string, outputPath string) (c *Client, e error) {
-	client := Client{
-		InputPath:  inputPath,
-		OutputPath: outputPath,
-	}
-	return &client, nil
-}
+func New(filepath string) (c *Client, e error) {
+	client := Client{}
 
-// Issac told me to put this here but honestly I don't know why
-func openFile(path string) (f *os.File, e error) {
-	file, err := os.Open(path)
+	f, err := os.Open(filepath)
 	if err != nil {
-		log.Printf("Error Reading File: %v\nError:%v\n", path, err)
-		return nil, err
+		log.Fatalf("Error: %v\n, Filepath: %v", err, filepath)
 	}
-	return file, err
-}
 
-func (c *Client) CreateTracker() (tr *tracker.Request) {
-	f, err := os.Open(c.InputPath)
+	m, err := torrent.Unmarshal(f)
 	if err != nil {
-		log.Printf("Error Reading File: %v\nError:%v\n", c.InputPath, err)
-		return nil
+		log.Fatalf("Error: %v\n, Filepath: %v", err, filepath)
 	}
-	torr := torrent.Create(f)
-	return tracker.NewTracker(torr)
-}
 
-func (c *Client) RemoveFunc(tr *tracker.Request) {
-	c.InfoHash = tr.InfoHash
-	c.PeerID = tr.PeerID
-}
-
-func (c *Client) GetPeers(t *tracker.Request) (tr *tracker.Response) {
-	resp, err := tracker.Get(t)
+	tr, err := tracker.GetPeers(m)
 	if err != nil {
-		log.Fatalf("Error fetching tracker: %v\nError: %v\n", t, err)
-		return nil
+		log.Fatalf("Error getting peers: %v\n, Tracker Response: %v", err, tr)
 	}
-	defer resp.Body.Close()
-	trackerResp := tracker.Read(resp.Body)
-	return trackerResp
-}
+	// change types that are returned
+	client.MetaInfo = m
+	client.Peers = &tr.Parsed
 
-func (c *Client) Shake() {
-	h := handshake.NewHandshake(c.InfoHash, c.PeerID)
-	b := h.Serialize()
-	fmt.Println(b)
+	return &client, err
 }

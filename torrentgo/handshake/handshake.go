@@ -1,35 +1,35 @@
 package handshake
 
+import (
+	"net"
+)
+
 type Handshake struct {
-	Pstr     string
 	InfoHash [20]byte
 	PeerID   [20]byte
+	Pstr     []byte
 }
 
-// Dial Connection
-// Send Overconnection
-// Read From Connection
-
-func NewHandshake(i [20]byte, p [20]byte) *Handshake {
-	pstr := "BitTorrent protocol"
-	h := Handshake{
-		Pstr:     pstr,
-		InfoHash: i,
-		PeerID:   p,
+func New(hash [20]byte, peerID [20]byte) (h *Handshake) {
+	return &Handshake{
+		InfoHash: hash,
+		PeerID:   peerID,
+		Pstr:     []byte("BitTorrent protocol"),
 	}
-	return &h
 }
 
-func (h *Handshake) Serialize() []byte {
-	b := make([]byte, 68)
-	index := 1
-	b[0] = byte(19)
-	index += copy(b[index:], []byte(h.Pstr))
-	index += copy(b[index:], make([]byte, 8))
-	index += copy(b[index:], h.InfoHash[:])
-	index += copy(b[index:], h.PeerID[:])
-	return b
+func (h *Handshake) Handshake() (conn *net.Conn) {
+	return nil
 }
 
-//func Dial(p *tracker.Peer) (conn *net.Conn, e error) {
-//}
+func (h *Handshake) serialize() []byte {
+	// use copy here
+	buf := make([]byte, len(h.Pstr)+49)
+	buf[0] = byte(len(h.Pstr)) // hopefully int coerces easily to byte
+	index := 1 + copy(buf[1:len(h.Pstr)+1], h.Pstr)
+	index += copy(buf[index:index+8], []byte{0, 0, 0, 0, 0, 0, 0, 0})
+	index += copy(buf[index:index+20], h.InfoHash[:])
+	index += copy(buf[index:index+20], h.PeerID[:])
+	// We haven't handeled errors here
+	return buf
+}

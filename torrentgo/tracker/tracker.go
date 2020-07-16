@@ -1,89 +1,87 @@
 package tracker
 
 import (
-	"bytes"
-	"crypto/sha1"
-	"encoding/hex"
-	"fmt"
+	// "fmt"
 	bencode "github.com/jackpal/bencode-go"
+	"github.com/zemberdotnet/gotorrent/peer"
 	"github.com/zemberdotnet/gotorrent/torrent"
 	"io"
-	"log"
+
+	"math/rand"
 	"net/http"
+	"net/url"
 )
 
-type Request struct {
-	Announce   string
-	InfoHash   [20]byte
-	PeerID     [20]byte
-	Port       int
-	Uploaded   string
-	Downloaded string
-	Left       string
-	Compact    string
-}
-
-type Response struct {
+// Tracker Response represents a bencoded response from a tracker
+type TrackerResponse struct {
 	Failure  string `bencode:"failure"`
 	Interval int    `bencode:"interval"`
-	//TrackerID	string
-	//Complete	int
-	//Incomplete	int
-	Peers []Peer `bencode:"peers"`
+	Peers    string `bencode:"peers"`
+	Parsed   *[]peer.Peer
 }
 
-type Peer struct {
-	IP   string `bencode:"ip"`
-	Port int    `bencode:"port"`
+// GetPeers
+func GetPeers(m *torrent.MetaInfo) (t *TrackerResponse, e error) {
+	id := newPeerID()
+	// fmt.Println(m.GetHash())
+	url := newRequest(m.GetAnnounce(), m.GetHash(), id)
+	return getPeers(url)
 }
 
-func Read(r io.ReadCloser) (trackResp *Response) {
-	t := Response{}
-	err := bencode.Unmarshal(r, &t)
+func getPeers(url string) (tResponse *TrackerResponse, e error) {
+	resp, err := http.Get(url)
 	if err != nil {
-		log.Fatalf("Error unmarshaling tracker reponse: %v", err)
+		// fmt.Println("returned before unmarshalling")
+		return &TrackerResponse{}, err
+		// TODO handle error
 	}
-	return &t
+	defer resp.Body.Close()
+	return Read(resp.Body)
 }
 
-func (t *Request) serialize() string {
-	an := t.Announce
-	ih := urlEncode(t.InfoHash)
-	id := urlEncode(t.PeerID)
-	return an + "?info_hash=" + ih + "&peer_id=" + id
-}
-
-func urlEncode(h [20]byte) (escapedString string) {
-	s := ""
-	for i := range h {
-		u := hex.EncodeToString(h[i : i+1])
-		s += "%" + u
-	}
-	return s
-}
-
-func Get(t *Request) (resp *http.Response, err error) {
-	url := t.serialize()
-	return http.Get(url)
-}
-
-func NewTracker(t *torrent.Torrent) (trackReq *Request) {
-
-	infoHash := hash(t)
-	peerid := sha1.Sum(([]byte("TATWD-----378894732")))
-	tracker := Request{
-		Announce: t.Announce,
-		InfoHash: infoHash,
-		PeerID:   peerid,
-	}
-	return &tracker
-}
-
-func hash(t *torrent.Torrent) [20]byte {
-	var buf bytes.Buffer
-	err := bencode.Marshal(&buf, t.InfoDict)
+// Format neutral to deal with bad responses from tracker
+// Maybe shouldn't have this method public
+func Read(r io.ReadCloser) (tResponse *TrackerResponse, e error) {
+	tr := TrackerResponse{}
+	err := bencode.Unmarshal(r, &tr)
 	if err != nil {
-		fmt.Println(err)
+		// TODO Better error handling
+		return &tr, err
 	}
-	return sha1.Sum(buf.Bytes())
+
+	return &tr, err
 }
+
+func newRequest(announce string, hash [20]byte, id [20]byte) (query string) {
+	base, err := url.Parse(announce)
+	if err != nil {
+		//log.Errorf("Announce url invalid: %v", url)
+	}
+	params := url.Values{
+		"info_hash": []string{string(hash[:])},
+		"peer_id":   []string{string(id[:])},
+		"event":     []string{"started"},
+		"compact":   []string{"1"},
+	}
+	base.RawQuery = params.Encode()
+	return base.String()
+
+}
+
+func newPeerID() [20]byte {
+	var bytes [20]byte
+	for i := 0; i < 20; i++ {
+		bytes[i] = byte(randomInt(65, 90))
+	}
+	return bytes
+}
+
+func randomInt(min, max int) int {
+	return min + rand.Intn(max-min)
+}
+
+/*
+Implement a udp connection later
+func dial(m) (c *Conn, err error) {
+	return net.Dial("udp",
+*/
