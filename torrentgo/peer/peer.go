@@ -3,6 +3,7 @@ package peer
 import (
 	"errors"
 	"net"
+	"strconv"
 )
 
 type Peer struct {
@@ -14,8 +15,7 @@ func Parse(s string) (p []Peer, e error) {
 	if len(s)%6 != 0 {
 		return nil, errors.New("Invalid compact response from tracker")
 	}
-	// later substitute for user specified peers
-	Peers := make([]Peer, 30)
+	Peers := make([]Peer, 0)
 	b := []byte(s)
 	for i := 0; i < len(b)-6; i++ {
 		peer := Peer{
@@ -35,4 +35,8 @@ func concatenate(x, y byte) uint16 {
 		pow *= 10
 	}
 	return uint16(i*pow + j)
+}
+
+func (p Peer) String() string {
+	return p.IP.String() + ":" + strconv.Itoa(int(p.Port))
 }

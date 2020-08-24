@@ -6,9 +6,9 @@ import (
 
 	"bytes"
 	"crypto/sha1"
-	"fmt"
 )
 
+// MetaInfo represents the bencoded information in a torrent file
 type MetaInfo struct {
 	Announce  string   `bencode:"announce"`
 	Comment   string   `bencode:"comment"`
@@ -16,9 +16,11 @@ type MetaInfo struct {
 	CreatedBy string   `bencode:"created by"`
 	Encoding  string   `bencode:"encoding"`
 	Info      InfoDict `bencode:"info"`
+	URLList   []string `bencode:"url-list"`
 	InfoHash  [20]byte
 }
 
+// InfoDict represents the info dictionary in a torrent file
 type InfoDict struct {
 	Length      int    `bencode:"length"`
 	Name        string `bencode:"name"`
@@ -28,15 +30,15 @@ type InfoDict struct {
 
 // Unmarshal takes in bencoded torrent informationa and returns
 // a struct of Go types representing the bencoded information
-func Unmarshal(f io.Reader) (Meta *MetaInfo, e error) {
-	m := MetaInfo{}
-	err := bencode.Unmarshal(f, &m)
+func Unmarshal(f io.Reader) (m *MetaInfo, err error) {
+	m = &MetaInfo{}
+	err = bencode.Unmarshal(f, m)
 	if err != nil {
-		// TODO Error Handling
-		return &m, err
+		return m, err
 	}
 	m.InfoHash = m.hash()
-	return &m, err
+	return
+	// return automatically returns the named parameters m and err
 }
 
 // hash re-Marshals the InfoDict of a torrent's MetaInfo and returns the
@@ -45,9 +47,8 @@ func (m *MetaInfo) hash() [20]byte {
 	var buf bytes.Buffer
 	err := bencode.Marshal(&buf, m.Info)
 	if err != nil {
-		// TODO Handle error
+		// TODO: Handle Error
 	}
-	fmt.Println(string(buf.Bytes()))
 	return sha1.Sum(buf.Bytes())
 }
 
@@ -58,5 +59,3 @@ func (m *MetaInfo) GetAnnounce() (url string) {
 func (m *MetaInfo) GetHash() (hash [20]byte) {
 	return m.InfoHash
 }
-
-// Define Get Methods for InfoDict??
