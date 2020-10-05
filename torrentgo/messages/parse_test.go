@@ -5,6 +5,41 @@ import (
 	"testing"
 )
 
+func TestParseMessage(t *testing.T) {
+	data := []struct {
+		input    []byte
+		expected *message
+		err      error
+	}{
+		{[]byte{0, 0, 0, 0}, &message{MsgKeepAlive, 0, 0, 0, nil}, nil}, // KeepAliveTest
+		// this test case should be updated to work
+		{[]byte{1, 1, 1, 1}, &message{MsgKeepAlive, 0, 0, 0, nil}, nil},                       // BadKeepAlive - Should result in an error
+		{[]byte{0, 0, 0, 1, MsgChoke}, &message{MsgChoke, 0, 0, 0, nil}, nil},                 // ChokeTest
+		{[]byte{0, 0, 0, 1, MsgUnchoke}, &message{MsgUnchoke, 0, 0, 0, nil}, nil},             // MsgUnchoke
+		{[]byte{0, 0, 0, 1, MsgInterested}, &message{MsgInterested, 0, 0, 0, nil}, nil},       // InterestedTest
+		{[]byte{0, 0, 0, 1, MsgNotInterested}, &message{MsgNotInterested, 0, 0, 0, nil}, nil}, // NotInterestedTest
+		{[]byte{0, 0, 0, 1, MsgNotInterested, 1}, nil, ErrInvalidMessageLength},               // Bad input test
+		{[]byte{0, 0, 0, 1, 12, 1}, nil, ErrInvalidMessageID},                                 // Bad input test
+	}
+	mp := NewMessageParser()
+	for _, e := range data {
+		message, err := mp.ParseMessage(e.input)
+		if err != e.err {
+			t.Log(e.input)
+			t.Errorf("Unexpected or missing error\nActual:\t%v\nExpected:\t%v\n", err, e.err)
+		}
+		if err != nil {
+			t.Logf("Recieved error\nErr:%v\nCase:%v\n", err, e.input)
+			continue // return, message will be nil so not safe to continue
+		}
+		if !reflect.DeepEqual(message, e.expected) {
+			t.Log("Case:", e.input)
+			t.Errorf("FAILED\nMessages do not match\nActual:%v\nExpected:%v\n", message, e.expected)
+
+		}
+	}
+}
+
 func TestParseBasicMessage(t *testing.T) {
 	data := []struct {
 		input    []byte

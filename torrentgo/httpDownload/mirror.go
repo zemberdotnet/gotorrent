@@ -32,6 +32,7 @@ func MirrorPieceGenerator(fileLength int) func(int, int) *mirrorPiece {
 	}
 }
 
+// going to move to a connections pacakge
 func MirrorGenerator(fileExt string) func(string) mirror {
 	return func(m string) mirror {
 		if strings.HasSuffix(m, fileExt) {
@@ -42,6 +43,7 @@ func MirrorGenerator(fileExt string) func(string) mirror {
 	}
 }
 
+// moved to a connections package
 func (m mirror) String() string {
 	return string(m)
 }

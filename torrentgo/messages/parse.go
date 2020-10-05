@@ -3,7 +3,6 @@ package messages
 import (
 	"encoding/binary"
 	"errors"
-	//"fmt"
 	"io"
 )
 
@@ -15,11 +14,23 @@ var ErrInvalidMessageLength error = errors.New("Invalid Message Length")
 var ErrInvalidPayload error = errors.New("Invalid Message Payload") // Bad n
 
 var ErrInvalidLength error = errors.New("Invalid Length Recieved")
+var ErrInvalidMessageID error = errors.New("Invalid Message ID Recieved")
+
+/*
+Wouldn't this be fun
+type Error string
+
+func (e Error) Error() string {
+	return string(e)
+}
+*/
 
 type messageParser struct {
-	funcs map[int]func([]byte) *message
+	funcs map[int]func([]byte) (*message, error)
 }
 
+// is this conncurently safe?
+// its just reads so I think so
 func NewMessageParser() *messageParser {
 	return &messageParser{
 		funcs: genMessageHandlers(),
@@ -32,7 +43,25 @@ func (m *message) ReadFrom(r io.Reader) (n int64, err error) {
 
 // Parse Message takes in bytes, reads the messageID and calls the parsing function
 func (mp *messageParser) ParseMessage(b []byte) (m *message, err error) {
-	return &message{}, nil
+	var parser func([]byte) (*message, error)
+	if len(b) <= 4 {
+		parser = mp.funcs[MsgKeepAlive]
+		m, err = parser(b)
+		if err != nil {
+			return
+		}
+		return
+	} else {
+		parser, ok := mp.funcs[int(b[4])]
+		if !ok {
+			return nil, ErrInvalidMessageID
+		}
+		m, err = parser(b)
+		if err != nil {
+			return nil, err
+		}
+		return
+	}
 }
 
 // We are entering dangerous teritory with this, but I think it makes things
@@ -114,6 +143,8 @@ func parsePieceMessage(b []byte) (m *message, err error) {
 
 }
 
+// Don't know if named variables are best here since we are actually init
+// in helper function
 func parseRequestMessage(b []byte) (*message, error) {
 	return cancelAndRequestParser(b)
 }
@@ -139,7 +170,17 @@ func cancelAndRequestParser(b []byte) (m *message, err error) {
 	return
 }
 
-func genMessageHandlers() map[int]func([]byte) *message {
-	m := make(map[int]func([]byte) *message)
-	return m
+func genMessageHandlers() map[int]func([]byte) (*message, error) {
+	return map[int]func([]byte) (*message, error){
+		MsgKeepAlive:     parseBasicMessage,
+		MsgChoke:         parseBasicMessage,
+		MsgUnchoke:       parseBasicMessage,
+		MsgInterested:    parseBasicMessage,
+		MsgNotInterested: parseBasicMessage,
+		MsgHave:          parseHaveMessage,
+		MsgBitfield:      parseBitfieldMessage,
+		MsgRequest:       parseRequestMessage,
+		MsgPiece:         parsePieceMessage,
+		MsgCancel:        parseCancelMessage,
+	}
 }

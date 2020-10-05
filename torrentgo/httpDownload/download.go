@@ -2,120 +2,88 @@ package httpDownload
 
 import (
 	"fmt"
-	"io/ioutil"
-	"math"
-	"net/http"
-	"time"
+	"github.com/zemberdotnet/gotorrent/interfaces"
+	"github.com/zemberdotnet/gotorrent/piece"
 )
 
 // Download is under heavy construction. I do not plan to retain this file as it is, but
 // it served as a Proof of Concept. It succesfully downloaded files under good conditions.
 // Now I plan to break this file into other packages/parts and make everything more elegant
 
-type download struct {
-	maxWorkers  int
-	fileLength  int
-	pieceLength int
-	numOfPieces int // Could change this implementation
+type mirrorDownload struct {
+	fileLength         int
+	pieceLength        int
+	pieceChannel       chan piece.Piece
+	recieveWorkChannel chan interfaces.Work
+	returnWorkChannel  chan interfaces.Work
 }
 
-func NewDownload(maxWorkers, fileLength, numOfPieces int) download {
-	return download{
-		maxWorkers:  maxWorkers,
-		fileLength:  fileLength,
-		numOfPieces: numOfPieces,
+func NewMirrorDownload(fileLength, pieceLength int) *mirrorDownload {
+	recv := make(chan interfaces.Work, 30)
+	rtrn := make(chan interfaces.Work)
+	return &mirrorDownload{
+		fileLength:         fileLength,
+		pieceLength:        pieceLength,
+		recieveWorkChannel: recv,
+		returnWorkChannel:  rtrn,
 	}
 }
 
-// Considerations:
-// Making a buffer of size d.fileLength is expensive. Future versions
-// Will switch to buffered io and a dedicated file forming package
+// maybe piece import here
+func (d *mirrorDownload) SetPieceChannel(c chan piece.Piece) {
+	d.pieceChannel = c
+}
+
+func (d *mirrorDownload) SetRecieveChannel(c chan interfaces.Work) {
+	d.recieveWorkChannel = c
+}
+
+func (d *mirrorDownload) SetReturnChannel(c chan interfaces.Work) {
+	d.returnWorkChannel = c
+}
+
+func (d *mirrorDownload) RecieveWorkChannel() chan interfaces.Work {
+	return d.recieveWorkChannel
+}
+
+func (d *mirrorDownload) ReturnWorkChannel() chan interfaces.Work {
+	return d.returnWorkChannel
+}
+
+func (d *mirrorDownload) PieceChannel() chan piece.Piece {
+	return d.pieceChannel
+}
+
+func (d *mirrorDownload) Multipiece() bool {
+	return true
+}
+
+func (d *mirrorDownload) URL() bool {
+	return true
+}
 
 // Very crude, but succesfully downloads as a Proof of Concept
-func (d download) DownloadFromMirrors(mirrors []string, fileExt string) []byte {
-	// Hard code 30 XD
-	buf := make([]byte, d.fileLength)
-	c := make(chan *FilePiece, d.numOfPieces)
-	workers := 0
-	i := 0
-	queue := d.GenMirrorPieces()
-	for {
-		if time.Now().Second()%10 == 0 {
-			fmt.Println(len(queue), workers)
+func (d mirrorDownload) Download() {
+	// get the next best piece to download
+	// download the next best piece
 
-		}
-
-		if len(queue) > 0 {
-			if workers < d.maxWorkers {
-				m := queue[0].NewMirror(mirrors[i] + fileExt)
-				i++
-				go m.download(c)
-				queue = queue[1:]
-				workers++
-			}
-		}
-
-		if len(c) > 0 {
-			workers--
-			temp := <-c
-			if temp.status {
-				copy(buf[temp.mirrorPiece.offset*temp.mirrorPiece.pieceLength:], temp.piece)
-			} else {
-				queue = append(queue, temp.mirrorPiece)
-			}
-		}
-		if len(queue) == 0 && workers == 0 {
-			fmt.Println("breaKing")
-			break
-		}
-
+	work := <-d.recieveWorkChannel
+	var conn interfaces.Connection
+	// You will regret this
+	// TODO MUST CHANGE OR WILL FREEZE IN CERTAIN CASES!!!!
+	for conn == nil {
+		conn = work.GetConnection()
 	}
-	return buf
-}
 
-// Also very crude. MirrorReq data type has been restructed and this function
-// will be tossed/changed
-func (m *mirrorReq) download(c chan<- *FilePiece) {
-	client := &http.Client{
-		Timeout: time.Second * 30,
-	}
-	resp, err := client.Do(m.req)
+	b, err := conn.AttemptDownloadPiece(work.GetTask())
 	if err != nil {
-		c <- &FilePiece{
-			mirrorPiece: m.mirrorPiece,
-		}
-		return
-	} else if resp.StatusCode != 206 {
-		c <- &FilePiece{
-			mirrorPiece: m.mirrorPiece,
-		}
-		return
+		fmt.Println(err)
 	}
-	defer resp.Body.Close()
+	fmt.Println(string(b))
 
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		c <- &FilePiece{
-			mirrorPiece: m.mirrorPiece,
-		}
-		return
-	}
-	c <- &FilePiece{
-		status:      true,
-		mirrorPiece: m.mirrorPiece,
-		piece:       body,
-	}
-}
+	//	fmt.Println(work.GetTask())
 
-// Generator for mirror pieces using the mirror piece generator function and callback
-func (d download) GenMirrorPieces() []*mirrorPiece {
-	// num of pieces, dynamic later, hard now
-	mPieces := make([]*mirrorPiece, d.numOfPieces)
-	// bad idea... yes it is :-)
-	pieceLength := int(math.Ceil(float64(d.fileLength) / float64(d.numOfPieces)))
-	generator := MirrorPieceGenerator(d.fileLength, pieceLength)
-	for i := 0; i < d.numOfPieces; i++ {
-		mPieces[i] = generator(i)
-	}
-	return mPieces
+	//fmt.Println(work)
+	d.returnWorkChannel <- work
+	// Go do things
 }

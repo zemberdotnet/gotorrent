@@ -2,16 +2,18 @@ package peer
 
 import (
 	"errors"
+	"github.com/zemberdotnet/gotorrent/bitfield"
 	"net"
 	"strconv"
 )
 
 type Peer struct {
-	IP   net.IP
-	Port uint16
+	IP       net.IP
+	Port     uint16
+	Bitfield bitfield.Bitfield
 }
 
-func Parse(s string) (p []Peer, e error) {
+func ParsePeers(s string) (p []Peer, e error) {
 	if len(s)%6 != 0 {
 		return nil, errors.New("Invalid compact response from tracker")
 	}

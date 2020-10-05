@@ -1,7 +1,6 @@
 package torrent
 
 import (
-	"fmt"
 	"os"
 	"testing"
 )
@@ -18,19 +17,16 @@ func TestUnmarshal(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unmarshal failed because %v", err)
 	}
+	// Add assertions for m
+
 }
 
 func TestInfoHash(t *testing.T) {
-	/*
-		m := &MetaInfo{
-			Info: InfoDict{
-				Length: 10
-				Name:
-	*/
-
+	// Empty should hash to 0s
 	m := &MetaInfo{}
-	fmt.Println(m)
+	// This won't work because field names are added
 	if m.hash() != [20]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} {
 		t.Errorf("Hash returned non-zero hash on empty InfoDict: %v", m.hash())
 	}
+
 }

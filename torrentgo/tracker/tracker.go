@@ -58,7 +58,7 @@ func (t *TrackerResponse) Read(r io.ReadCloser) (tResponse *TrackerResponse, e e
 		return t, err
 	}
 
-	t.Parsed, err = peer.Parse(t.Peers)
+	t.Parsed, err = peer.ParsePeers(t.Peers)
 	if err != nil {
 		// TODO Handle Error
 	}

@@ -2,7 +2,6 @@ package handshake
 
 import (
 	"io"
-	"io/ioutil"
 )
 
 // Handshake represents the byte array sent as a Handshake to peers
@@ -23,7 +22,7 @@ func NewHandshake(hash [20]byte, peerID [20]byte) (h *Handshake) {
 	}
 }
 
-// WriteTo wraps an io.Writer.
+// WriteTo wraps an io.Writer. So this isn't quite right
 // It fuffils the io.WriterTo interface
 func (h *Handshake) WriteTo(w io.Writer) (n int64, err error) {
 	i, err := w.Write(h.serialize())
@@ -34,10 +33,11 @@ func (h *Handshake) WriteTo(w io.Writer) (n int64, err error) {
 }
 
 // ReadFrom reads from an io.Reader and returns a Handshake and an error
-func ReadFrom(r io.Reader) (h *Handshake, err error) {
-	buf, err := ioutil.ReadAll(r)
+func (h *Handshake) ReadFrom(r io.Reader) (n int64, err error) {
+	buf := make([]byte, 1)
+	i, err := io.ReadFull(r, buf)
 	if err != nil {
-		return nil, err
+		return int64(i), err
 	}
 
 	var infoHash, peerID [20]byte
@@ -45,11 +45,11 @@ func ReadFrom(r io.Reader) (h *Handshake, err error) {
 	copy(infoHash[:], buf[2+int(buf[0]):22+int(buf[0])])
 	copy(peerID[:], buf[23+int(buf[0]):])
 
-	return &Handshake{
-		Pstr:     buf[1 : 1+int(buf[0])],
-		InfoHash: infoHash,
-		PeerID:   peerID,
-	}, nil
+	h.Pstr = buf[1 : 1+int(buf[0])]
+	h.InfoHash = infoHash
+	h.PeerID = peerID
+
+	return int64(49 + i), nil
 }
 
 /*

@@ -54,7 +54,7 @@ func (c *Client) ConnectToPeers() {
 		for i := 0; i < 20; i++ {
 
 			fmt.Println("Now connecting to:", c.Peers[i])
-			h := handshake.New(c.Peers[i], c.MetaInfo.InfoHash, c.Tracker.PeerID)
+			h := handshake.NewHandshake(c.Peers[i], c.MetaInfo.InfoHash, c.Tracker.PeerID)
 
 			conn, err = h.Handshake()
 			if err != nil {
