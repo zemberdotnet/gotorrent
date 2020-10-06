@@ -1,6 +1,7 @@
 package httpDownload
 
 import (
+	"fmt"
 	"github.com/zemberdotnet/gotorrent/bitfield"
 	"github.com/zemberdotnet/gotorrent/interfaces"
 	"io/ioutil"
@@ -19,7 +20,9 @@ func (m MirrorConn) Dial() {
 
 // might be better to return a reader/writer and save on memory?
 // sensible max downlods will be needed
-func (m MirrorConn) AttemptDownloadPiece(task interfaces.Task) ([]byte, error) {
+func (m MirrorConn) AttemptDownloadPiece(task interfaces.Piece) ([]byte, error) {
+	fmt.Println(m.Url, m.FileExt)
+
 	req, err := m.buildRequest(task)
 	if err != nil {
 		return nil, err

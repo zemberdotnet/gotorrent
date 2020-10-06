@@ -4,8 +4,8 @@ import ()
 
 type Work interface {
 	SetStrategy(Strategy)
-	SetTask(Task) // ad
-	GetTask() Task
+	SetPiece(Piece) // ad
+	GetPiece() Piece
 	GetStrategy() Strategy
 	GetConnection() Connection
 	Do() // do the work

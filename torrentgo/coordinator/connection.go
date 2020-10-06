@@ -19,12 +19,15 @@ type AbstractConn struct {
 type ConnCreator struct {
 	URLSource  []string
 	PeerSource []peer.Peer
+	FileExt    string
 	Active     []interfaces.Connection
 }
 
-func NewConnectionFactory(urlSource []string, peerSource []peer.Peer) interfaces.ConnectionCreator {
+// this is probably more tightly coupled than we'd like
+func NewConnectionFactory(urlSource []string, peerSource []peer.Peer, FileExt string) interfaces.ConnectionCreator {
 	return &ConnCreator{
 		URLSource:  urlSource,
+		FileExt:    FileExt, // single file only
 		PeerSource: peerSource,
 	}
 }
@@ -40,7 +43,7 @@ func (cc *ConnCreator) GetConnection(s interfaces.Strategy) interfaces.Connectio
 				cc.URLSource, pop = cc.URLSource[0:len(cc.URLSource)-1], cc.URLSource[len(cc.URLSource)-1]
 				return httpDownload.MirrorConn{
 					Url:     pop,
-					FileExt: "",
+					FileExt: cc.FileExt,
 				}
 			}
 			// Create using URL strategy

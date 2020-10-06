@@ -1,12 +1,12 @@
 package tracker
 
 import (
-	"fmt"
 	bencode "github.com/jackpal/bencode-go"
 	"github.com/zemberdotnet/gotorrent/peer"
 	"github.com/zemberdotnet/gotorrent/torrent"
 	"io"
 
+	"errors"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -30,11 +30,7 @@ func GetPeers(m *torrent.MetaInfo) (t *TrackerResponse, e error) {
 	t = &TrackerResponse{}
 	id := newPeerID()
 	if m.GetAnnounce() == "" {
-		url := newRequest(m.URLList[0], m.GetHash(), id)
-		fmt.Println("URL:", url)
-
-		t.PeerID = id
-		return t.getPeers(url)
+		return nil, errors.New("No announce url or hash")
 	}
 	url := newRequest(m.GetAnnounce(), m.GetHash(), id)
 	t.PeerID = id

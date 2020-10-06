@@ -1,16 +1,21 @@
 package client
 
 import (
-	"bytes"
-	"fmt"
-	"github.com/zemberdotnet/gotorrent/handshake"
-	//	"github.com/zemberdotnet/gotorrent/httpDownload"
+	//"bytes"
+	//"fmt"
+	"github.com/zemberdotnet/gotorrent/bitfield"
+	"github.com/zemberdotnet/gotorrent/coordinator"
+	"github.com/zemberdotnet/gotorrent/piece"
+	//"github.com/zemberdotnet/gotorrent/handshake"
+	"github.com/zemberdotnet/gotorrent/httpDownload"
+	"github.com/zemberdotnet/gotorrent/interfaces"
+	"github.com/zemberdotnet/gotorrent/p2p"
 	"github.com/zemberdotnet/gotorrent/peer"
 	"github.com/zemberdotnet/gotorrent/torrent"
 	"github.com/zemberdotnet/gotorrent/tracker"
-	"io"
+	//"io"
 	"log"
-	"net"
+	//"net"
 	"os"
 )
 
@@ -37,16 +42,18 @@ func New(filepath string) (c *Client, e error) {
 
 	tr, err := tracker.GetPeers(m)
 	if err != nil {
-		log.Fatalf("Error getting peers: %v\n, Tracker Response: %v", err, tr)
+		log.Printf("Error getting peers: %v\n, Tracker Response: %v\nProceeding...", err, tr)
 	}
 
 	client.MetaInfo = m
-	client.Peers = tr.Parsed
-	client.Tracker = tr
-
+	if tr != nil {
+		client.Tracker = tr
+		client.Peers = tr.Parsed
+	}
 	return &client, err
 }
 
+/*
 func (c *Client) ConnectToPeers() {
 	var conn net.Conn
 	var err error
@@ -70,4 +77,47 @@ func (c *Client) ConnectToPeers() {
 		io.Copy(&buf, conn)
 		fmt.Println(buf.Len())
 	}
+}
+*/
+
+func (c *Client) Coordinate() {
+	pieceChan := make(chan interface{})
+	file := piece.NewFile(c.MetaInfo.Length(), pieceChan)
+
+	var cc interfaces.ConnectionCreator
+	var strats []interfaces.Strategy
+	b := bitfield.NewBitfield( /*Number of Pieces*/ c.MetaInfo.Length())
+	// this is probably to literal
+	if c.Peers != nil && c.MetaInfo.URLList != nil { // torrnet and webseed
+		cc = coordinator.NewConnectionFactory(c.MetaInfo.URLList, c.Peers, c.MetaInfo.Info.Name)
+		mirrorDL := httpDownload.NewMirrorDownload(c.MetaInfo.Length(), c.MetaInfo.PieceLength())
+		torrentDL := p2p.NewTorrentDownload(c.MetaInfo.Length())
+		strats = []interfaces.Strategy{mirrorDL, torrentDL}
+	} else if c.Peers != nil { // Just torrentDL
+		cc = coordinator.NewConnectionFactory(nil, c.Peers, c.MetaInfo.Info.Name)
+		torrentDL := p2p.NewTorrentDownload(c.MetaInfo.Length())
+		strats = []interfaces.Strategy{torrentDL}
+	} else {
+		cc = coordinator.NewConnectionFactory(c.MetaInfo.URLList, nil, c.MetaInfo.Info.Name)
+		mirrorDL := httpDownload.NewMirrorDownload(c.MetaInfo.Length(), c.MetaInfo.PieceLength())
+		strats = []interfaces.Strategy{mirrorDL}
+	}
+	// if urllist available	&& peer list
+	// add both strategies
+	// else if urllist
+	// mirrorstrategy
+	// else
+	// peer list strategy
+	ws := coordinator.NewBasicScheduler(b, cc)
+	lb := coordinator.NewBasicLoadBalancer()
+
+	for _, strategy := range strats {
+		strategy.SetPieceChannel(pieceChan)
+		ws.AddStrategyToWork(strategy, &coordinator.AbstractWork{})
+		lb.AddStrategy(strategy, 30)
+	}
+
+	coordinator.Coordinate(lb, ws, nil)
+
+	file.WriteToFile("/home/snow/")
 }

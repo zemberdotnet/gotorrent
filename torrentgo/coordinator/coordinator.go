@@ -67,7 +67,7 @@ func mainCoordinate() {
 	strat := httpDownload.NewMirrorDownload(123456789, 1234)
 	d := strat.ReturnWorkChannel()
 
-	cc := NewConnectionFactory([]string{"http://example.com"}, nil)
+	cc := NewConnectionFactory([]string{"http://example.com"}, nil, "")
 
 	ws := NewBasicScheduler(&bf, cc)
 	ws.AddStrategyToWork(strat, &AbstractWork{})

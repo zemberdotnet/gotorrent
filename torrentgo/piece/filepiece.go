@@ -9,17 +9,10 @@ type Piece interface {
 	Offset() int
 }
 
-// A file piece is made up of blocks
-
 type FilePiece struct {
 	piece []byte
 	index int
 	begin int
-}
-
-// Collection of all FilePieces
-type File struct {
-	Pieces []*FilePiece
 }
 
 // Write to FilePiece

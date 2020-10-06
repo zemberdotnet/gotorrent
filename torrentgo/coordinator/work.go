@@ -6,7 +6,7 @@ import (
 
 type AbstractWork struct {
 	strategy interfaces.Strategy
-	task     interfaces.Task
+	piece    interfaces.Piece
 	conn     interfaces.ConnectionCreator
 	status   bool
 }
@@ -25,29 +25,29 @@ func (bs *BasicScheduler) NewWorkFromStrategy(s interfaces.Strategy) interfaces.
 	if s.Multipiece() {
 		return &AbstractWork{
 			strategy: s,
-			task:     bs.taskFactory(true),
+			piece:    bs.pieceFactory(true),
 			conn:     bs.connCreator,
 		}
 
 	} else {
 		return &AbstractWork{
 			strategy: s,
-			task:     bs.taskFactory(false),
+			piece:    bs.pieceFactory(false),
 			conn:     bs.connCreator,
 		}
 	}
 }
 
-func (a *AbstractWork) GetTask() interfaces.Task {
-	return a.task
+func (a *AbstractWork) GetPiece() interfaces.Piece {
+	return a.piece
 }
 
 func (a *AbstractWork) SetStrategy(s interfaces.Strategy) {
 	a.strategy = s
 }
 
-func (a *AbstractWork) SetTask(t interfaces.Task) {
-	a.task = t
+func (a *AbstractWork) SetPiece(t interfaces.Piece) {
+	a.piece = t
 
 }
 

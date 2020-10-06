@@ -59,3 +59,11 @@ func (m *MetaInfo) GetAnnounce() (url string) {
 func (m *MetaInfo) GetHash() (hash [20]byte) {
 	return m.InfoHash
 }
+
+func (m *MetaInfo) Length() int {
+	return m.Info.Length
+}
+
+func (m *MetaInfo) PieceLength() int {
+	return m.Info.PieceLength
+}

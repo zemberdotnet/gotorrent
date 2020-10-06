@@ -1,10 +1,10 @@
 package client
 
 import (
-	"crypto/sha1"
+	//	"crypto/sha1"
 	"fmt"
-	"io/ioutil"
-	"os"
+	//"io/ioutil"
+	//"os"
 	"testing"
 )
 
@@ -22,31 +22,16 @@ func TestNew(t *testing.T) {
 	// fmt.Println(c)
 	// fmt.Println(c.Peers)
 
-	c.ConnectToPeers()
+	//c.ConnectToPeers()
 
 }
 
-/*
-func DontTestDownload(t *testing.T) {
+func TestClient(t *testing.T) {
 	filepath := "/home/snow/Projects/Coding/go/gotorrent/arch.torrent"
 	c, err := New(filepath)
 	if err != nil {
-		fmt.Println(err)
+		t.Errorf("ERROR: %v", err)
 	}
 
-	c.DownloadHTTP()
-}
-*/
-
-func DontTestShaSum(t *testing.T) {
-	filepath := "/home/snow/Projects/Coding/go/gotorrent/torrentgo/client/test.iso"
-	fmt.Println("hello")
-	f, err := os.Open(filepath)
-	if err != nil {
-		return
-	}
-	b, _ := ioutil.ReadAll(f)
-	fmt.Println(sha1.Sum(b))
-	fmt.Println("above")
-
+	c.Coordinate()
 }

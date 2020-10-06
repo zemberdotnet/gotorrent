@@ -43,7 +43,7 @@ func TestLargestGap(t *testing.T) {
 	}
 
 	fmt.Println(b.Bitfield)
-	fmt.Println(b.largestGap())
+	fmt.Println(b.LargestGap())
 }
 
 func BenchmarkLargestGap(b *testing.B) {
@@ -61,5 +61,5 @@ func BenchmarkLargestGap(b *testing.B) {
 			bt.SetPiece(randInt)
 		}
 	}
-	_, _ = bt.largestGap()
+	_, _ = bt.LargestGap()
 }

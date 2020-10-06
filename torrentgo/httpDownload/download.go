@@ -3,7 +3,6 @@ package httpDownload
 import (
 	"fmt"
 	"github.com/zemberdotnet/gotorrent/interfaces"
-	"github.com/zemberdotnet/gotorrent/piece"
 )
 
 // Download is under heavy construction. I do not plan to retain this file as it is, but
@@ -13,7 +12,7 @@ import (
 type mirrorDownload struct {
 	fileLength         int
 	pieceLength        int
-	pieceChannel       chan piece.Piece
+	pieceChannel       chan interface{} // interface channel
 	recieveWorkChannel chan interfaces.Work
 	returnWorkChannel  chan interfaces.Work
 }
@@ -30,7 +29,7 @@ func NewMirrorDownload(fileLength, pieceLength int) *mirrorDownload {
 }
 
 // maybe piece import here
-func (d *mirrorDownload) SetPieceChannel(c chan piece.Piece) {
+func (d *mirrorDownload) SetPieceChannel(c chan interface{}) {
 	d.pieceChannel = c
 }
 
@@ -50,7 +49,7 @@ func (d *mirrorDownload) ReturnWorkChannel() chan interfaces.Work {
 	return d.returnWorkChannel
 }
 
-func (d *mirrorDownload) PieceChannel() chan piece.Piece {
+func (d *mirrorDownload) PieceChannel() chan interface{} {
 	return d.pieceChannel
 }
 
@@ -75,7 +74,7 @@ func (d mirrorDownload) Download() {
 		conn = work.GetConnection()
 	}
 
-	b, err := conn.AttemptDownloadPiece(work.GetTask())
+	b, err := conn.AttemptDownloadPiece(work.GetPiece())
 	if err != nil {
 		fmt.Println(err)
 	}

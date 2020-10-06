@@ -11,7 +11,7 @@ type ConnectionCreator interface {
 
 type Connection interface {
 	Dial()
-	AttemptDownloadPiece(Task) ([]byte, error)
+	AttemptDownloadPiece(Piece) ([]byte, error)
 	Active() bool
 	Status() int
 	Bitfield() bitfield.Bitfield

@@ -2,6 +2,7 @@ package httpDownload
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/zemberdotnet/gotorrent/interfaces"
 	"net/http"
 	"strconv"
@@ -9,7 +10,7 @@ import (
 )
 
 // probaly would be moved to another package or not who know
-func (m MirrorConn) buildRequest(task interfaces.Task) (req *http.Request, err error) {
+func (m MirrorConn) buildRequest(task interfaces.Piece) (req *http.Request, err error) {
 	req, err = http.NewRequest("GET", m.Url+m.FileExt, new(bytes.Buffer))
 	if err != nil {
 		return
@@ -18,7 +19,7 @@ func (m MirrorConn) buildRequest(task interfaces.Task) (req *http.Request, err e
 	return
 }
 
-func (m MirrorConn) buildHeader(task interfaces.Task) string {
+func (m MirrorConn) buildHeader(task interfaces.Piece) string {
 	var b1 strings.Builder
 
 	b1.Write([]byte{'b', 'y', 't', 'e', 's', '='})
@@ -29,5 +30,6 @@ func (m MirrorConn) buildHeader(task interfaces.Task) string {
 
 	ans := task.Length()*(task.Index()+1) - 1
 	b1.WriteString(strconv.Itoa(ans))
+	fmt.Println(b1.String())
 	return b1.String()
 }

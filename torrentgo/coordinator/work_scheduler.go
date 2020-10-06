@@ -19,7 +19,7 @@ type BasicScheduler struct {
 	started        bool
 	workChan       chan interfaces.Work
 	strategyToWork map[interfaces.Strategy]interfaces.Work
-	taskFactory    func(bool) interfaces.Task
+	pieceFactory   func(bool) interfaces.Piece
 	connCreator    interfaces.ConnectionCreator
 }
 
@@ -30,7 +30,7 @@ func NewBasicScheduler(bt *bitfield.Bitfield, cc interfaces.ConnectionCreator) *
 	return &BasicScheduler{
 		workChan:       c,
 		strategyToWork: s,
-		taskFactory:    TaskFactory(bt),
+		pieceFactory:   PieceFactory(bt),
 		connCreator:    cc,
 	}
 }
@@ -69,11 +69,14 @@ func (b *BasicScheduler) Handle(w interfaces.Work) interfaces.Work {
 }
 
 func (b *BasicScheduler) Return(w interfaces.Work) {
-	if w.GetTask().Completed() {
 
-	} else {
-		// requeu this
-	}
+	/*
+		if w.GetPiece().Completed() {
+
+		} else {
+			// requeu this
+		}
+	*/
 }
 
 func (b *BasicScheduler) GetWork() interfaces.Work {
