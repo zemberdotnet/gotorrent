@@ -1,9 +1,9 @@
 package coordinator
 
 import (
-	//	"fmt"
 	"github.com/zemberdotnet/gotorrent/bitfield"
 	"github.com/zemberdotnet/gotorrent/interfaces"
+	"math"
 )
 
 // A better implementation may be pulling apart the scheduling and
@@ -16,100 +16,92 @@ type workScheduler interface {
 }
 
 type BasicScheduler struct {
-	started        bool
 	workChan       chan interfaces.Work
 	strategyToWork map[interfaces.Strategy]interfaces.Work
 	pieceFactory   func(bool) interfaces.Piece
 	connCreator    interfaces.ConnectionCreator
+	bitfield       *bitfield.Bitfield
 }
 
-func NewBasicScheduler(bt *bitfield.Bitfield, cc interfaces.ConnectionCreator) *BasicScheduler {
+func NewBasicScheduler(bt *bitfield.Bitfield, cc interfaces.ConnectionCreator, hashes [][]byte) *BasicScheduler {
 	c := make(chan interfaces.Work)
 	s := make(map[interfaces.Strategy]interfaces.Work)
 
 	return &BasicScheduler{
 		workChan:       c,
 		strategyToWork: s,
-		pieceFactory:   PieceFactory(bt),
+		pieceFactory:   PieceFactory(bt, hashes),
 		connCreator:    cc,
+		bitfield:       bt,
 	}
 }
 
-/*
-func (b *BasicScheduler) Schedule(s interfaces.Strategy) {
-	for _, e := range b.returnedQueue {
-		if e.GetStrategy() == s {
-			b.workChan <- b.Handle(e)
-		}
-	}
-	if b.started {
-		b.workChan <- b.generateWork(s)
-	} else {
-		b.workChan <- b.generateFirstWork(s)
-		b.started = true
-	}
-}
-*/
-
-/*
-func (b *BasicScheduler) WorkFactory() {
-	// Inspect the
-	if len(b.workChan) < 100 {
-		b.workChan <- b.generateWork(s)
-	}
-}
-*/
 func (b *BasicScheduler) AddStrategyToWork(s interfaces.Strategy, w interfaces.Work) {
 	b.strategyToWork[s] = w
 }
 
-func (b *BasicScheduler) Handle(w interfaces.Work) interfaces.Work {
-
-	return nil
-}
-
+// Placeholder
 func (b *BasicScheduler) Return(w interfaces.Work) {
-
-	/*
-		if w.GetPiece().Completed() {
-
-		} else {
-			// requeu this
-		}
-	*/
 }
 
+// GetWork wraps around generateWork and sends the work to the channel if its not full
+// If the queue is full then we throw away the piece and unset it in the bitfield
 func (b *BasicScheduler) GetWork() interfaces.Work {
-	full := true
-	for full {
-		for k, _ := range b.strategyToWork {
-			//			fmt.Println("LENGTH:", len(k.RecieveWorkChannel()))
-			if len(k.RecieveWorkChannel()) < cap(k.RecieveWorkChannel()) {
-				full = false
-			}
-		}
+	work := b.generateWork()
+	if work == nil {
+		return nil
 	}
 
-	return b.generateWork()
+	select {
+	case work.GetStrategy().RecieveWorkChannel() <- work:
+	default:
+		b.bitfield.UnsetPieceRange(work.GetPiece().Index(), work.GetPiece().Length())
+
+	}
+
+	return work
 }
 
+// generateWork choses the strategy to generate work for
 func (b *BasicScheduler) generateWork() interfaces.Work {
 	var minStrat interfaces.Strategy
-	var minQueueSize int = 100000000
-	var _ interfaces.Work
-	for k, v := range b.strategyToWork {
+	var minQueueSize int = math.MaxInt64
+
+	// An alternative for the future is doling out the work here
+	// This would make sending on the channel easier
+
+	for k, _ := range b.strategyToWork {
 		if minStrat == nil {
 			minStrat = k
+			minQueueSize = len(k.RecieveWorkChannel())
 		}
 
 		if len(k.RecieveWorkChannel()) < minQueueSize {
 			minQueueSize = len(k.RecieveWorkChannel())
 			minStrat = k
-			_ = v
 		}
 	}
 
-	//	return workType.Create()
 	return b.NewWorkFromStrategy(minStrat)
+}
 
+func (b *BasicScheduler) NewWorkFromStrategy(s interfaces.Strategy) interfaces.Work {
+	if s.Multipiece() {
+		piece := b.pieceFactory(true)
+		if piece == nil {
+			return nil
+		}
+
+		return &AbstractWork{
+			strategy: s,
+			piece:    piece,
+			conn:     b.connCreator,
+		}
+	} else {
+		return &AbstractWork{
+			strategy: s,
+			piece:    b.pieceFactory(false),
+			conn:     b.connCreator,
+		}
+	}
 }

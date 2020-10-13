@@ -9,6 +9,7 @@ import (
 )
 
 func TestNew(t *testing.T) {
+
 	filepath := "/home/snow/Projects/Coding/go/gotorrent/debian.torrent"
 	c, err := New(filepath)
 	if err != nil {

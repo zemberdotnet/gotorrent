@@ -1,26 +1,22 @@
 package client
 
 import (
-	//"bytes"
-	//"fmt"
+	"context"
+	"fmt"
 	"github.com/zemberdotnet/gotorrent/bitfield"
 	"github.com/zemberdotnet/gotorrent/coordinator"
-	"github.com/zemberdotnet/gotorrent/piece"
-	//"github.com/zemberdotnet/gotorrent/handshake"
 	"github.com/zemberdotnet/gotorrent/httpDownload"
 	"github.com/zemberdotnet/gotorrent/interfaces"
 	"github.com/zemberdotnet/gotorrent/p2p"
 	"github.com/zemberdotnet/gotorrent/peer"
+	"github.com/zemberdotnet/gotorrent/piece"
 	"github.com/zemberdotnet/gotorrent/torrent"
 	"github.com/zemberdotnet/gotorrent/tracker"
-	//"io"
 	"log"
-	//"net"
 	"os"
 )
 
-// Client is due to be rewritten.
-
+// Client represents one torrent download
 type Client struct {
 	MetaInfo *torrent.MetaInfo
 	Tracker  *tracker.TrackerResponse
@@ -52,72 +48,77 @@ func New(filepath string) (c *Client, e error) {
 	}
 	return &client, err
 }
+func (c *Client) CreateConnCreatorFromStrategies(strats []interfaces.Strategy) interfaces.ConnectionCreator {
 
-/*
-func (c *Client) ConnectToPeers() {
-	var conn net.Conn
-	var err error
-	if len(c.Peers) != 0 {
-		for i := 0; i < 20; i++ {
-
-			fmt.Println("Now connecting to:", c.Peers[i])
-			h := handshake.NewHandshake(c.Peers[i], c.MetaInfo.InfoHash, c.Tracker.PeerID)
-
-			conn, err = h.Handshake()
-			if err != nil {
-				fmt.Println("Error Connecting:", err)
-				continue
-			} else {
-				break
-			}
+	var multi bool = false
+	var single bool = false
+	var cc interfaces.ConnectionCreator
+	for _, strat := range strats {
+		if strat.Multipiece() == false {
+			single = true
+		} else {
+			multi = true
 		}
-		defer conn.Close()
-		var buf bytes.Buffer
-
-		io.Copy(&buf, conn)
-		fmt.Println(buf.Len())
 	}
+	// might be better to just send this logic lower and have nil handling
+	if multi && single {
+		cc = coordinator.NewConnectionFactory(c.MetaInfo.URLList, c.Peers, c.MetaInfo.Info.Name)
+	} else if multi {
+		cc = coordinator.NewConnectionFactory(c.MetaInfo.URLList, nil, c.MetaInfo.Info.Name)
+	} else {
+		cc = coordinator.NewConnectionFactory(nil, c.Peers, c.MetaInfo.Info.Name)
+	}
+	return cc
 }
-*/
 
 func (c *Client) Coordinate() {
-	pieceChan := make(chan interface{})
-	file := piece.NewFile(c.MetaInfo.Length(), pieceChan)
 
-	var cc interfaces.ConnectionCreator
-	var strats []interfaces.Strategy
-	b := bitfield.NewBitfield( /*Number of Pieces*/ c.MetaInfo.Length())
-	// this is probably to literal
-	if c.Peers != nil && c.MetaInfo.URLList != nil { // torrnet and webseed
-		cc = coordinator.NewConnectionFactory(c.MetaInfo.URLList, c.Peers, c.MetaInfo.Info.Name)
-		mirrorDL := httpDownload.NewMirrorDownload(c.MetaInfo.Length(), c.MetaInfo.PieceLength())
-		torrentDL := p2p.NewTorrentDownload(c.MetaInfo.Length())
-		strats = []interfaces.Strategy{mirrorDL, torrentDL}
-	} else if c.Peers != nil { // Just torrentDL
-		cc = coordinator.NewConnectionFactory(nil, c.Peers, c.MetaInfo.Info.Name)
-		torrentDL := p2p.NewTorrentDownload(c.MetaInfo.Length())
-		strats = []interfaces.Strategy{torrentDL}
-	} else {
-		cc = coordinator.NewConnectionFactory(c.MetaInfo.URLList, nil, c.MetaInfo.Info.Name)
-		mirrorDL := httpDownload.NewMirrorDownload(c.MetaInfo.Length(), c.MetaInfo.PieceLength())
-		strats = []interfaces.Strategy{mirrorDL}
-	}
-	// if urllist available	&& peer list
-	// add both strategies
-	// else if urllist
-	// mirrorstrategy
-	// else
-	// peer list strategy
-	ws := coordinator.NewBasicScheduler(b, cc)
+	hashes := c.MetaInfo.PieceHashes()
+	fmt.Println(len(hashes))
+
+	pieceChan := make(chan interface{})
+
+	b := bitfield.NewBitfield( /*Number of Pieces*/ c.MetaInfo.Pieces())
+	file := piece.NewFile(pieceChan, b)
+
+	strats := c.CreateStrategies()
+	cc := c.CreateConnCreatorFromStrategies(strats)
+
+	workChan := make(chan interfaces.Work)
+
+	ws := coordinator.NewBasicScheduler(b, cc, hashes)
 	lb := coordinator.NewBasicLoadBalancer()
 
 	for _, strategy := range strats {
 		strategy.SetPieceChannel(pieceChan)
+		strategy.SetReturnChannel(workChan)
 		ws.AddStrategyToWork(strategy, &coordinator.AbstractWork{})
 		lb.AddStrategy(strategy, 30)
 	}
+	// might be good to make a coordinator object
+	coordinator := coordinator.NewCoordinator(lb, ws, workChan)
 
-	coordinator.Coordinate(lb, ws, nil)
+	ctx, cancel := context.WithCancel(context.Background())
 
-	file.WriteToFile("/home/snow/")
+	go coordinator.Coordinate(ctx)
+
+	file.WriteToFile(cancel, "/home/snow/testfile")
+}
+
+// CreateStrategies is a helper function to create
+// available strategies based on tracker response and torrent file
+func (c *Client) CreateStrategies() []interfaces.Strategy {
+	var strats []interfaces.Strategy
+	if c.Peers != nil && c.MetaInfo.URLList != nil { // torrnet and webseed
+		mirrorDL := httpDownload.NewMirrorDownload(c.MetaInfo.Pieces(), c.MetaInfo.PieceLength())
+		torrentDL := p2p.NewTorrentDownload(c.MetaInfo.Pieces())
+		strats = []interfaces.Strategy{mirrorDL, torrentDL}
+	} else if c.Peers != nil { // Just torrentDL
+		torrentDL := p2p.NewTorrentDownload(c.MetaInfo.Pieces())
+		strats = []interfaces.Strategy{torrentDL}
+	} else {
+		mirrorDL := httpDownload.NewMirrorDownload(c.MetaInfo.Pieces(), c.MetaInfo.PieceLength())
+		strats = []interfaces.Strategy{mirrorDL}
+	}
+	return strats
 }

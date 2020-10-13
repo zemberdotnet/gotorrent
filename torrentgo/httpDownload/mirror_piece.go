@@ -4,6 +4,10 @@ import (
 	"io"
 )
 
+// Currently unused, likely to be deleted soon as abstractPiece does the job
+// for all strategies
+
+// mirrorPiece is an implementation of interfaces.Piece
 type mirrorPiece struct {
 	piece  []byte
 	hash   string
@@ -37,7 +41,7 @@ func (m *mirrorPiece) Offset() int {
 }
 
 // need impementation
-func (m *mirrorPiece) Validate(b []byte) bool {
+func (m *mirrorPiece) Validate() bool {
 	return false
 }
 

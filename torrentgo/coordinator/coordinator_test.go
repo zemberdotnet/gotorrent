@@ -5,5 +5,4 @@ import (
 )
 
 func TestThings(t *testing.T) {
-	mainCoordinate()
 }

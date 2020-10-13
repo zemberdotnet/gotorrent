@@ -1,7 +1,5 @@
 package interfaces
 
-import ()
-
 type Strategy interface {
 	Download()
 	// These are all communication features

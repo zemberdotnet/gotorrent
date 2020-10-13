@@ -1,37 +1,43 @@
 package coordinator
 
 import (
-	"fmt"
-	"github.com/zemberdotnet/gotorrent/bitfield"
-	"github.com/zemberdotnet/gotorrent/httpDownload"
+	"context"
 	"github.com/zemberdotnet/gotorrent/interfaces"
+	"sync"
 	"time"
 )
 
-/*
-type BasicCoordinator struct {
-	bitfields []bitfield.Bitfield
+type coordinator struct {
+	lb loadBalancer
+	ws workScheduler
+	ch chan interfaces.Work
 }
-*/
 
-// Maybe need something that is a method of the bitfield, like
-// take in bitfield -> process -> use bitfield to determine next best worker
+func NewCoordinator(lb loadBalancer, ws workScheduler, d chan interfaces.Work) coordinator {
+	return coordinator{
+		lb: lb,
+		ws: ws,
+		ch: d,
+	}
+}
 
-func Coordinate(lb loadBalancer, ws workScheduler, d chan interfaces.Work) {
-	// Worker
-	// Workers should maintain a connection until that connection fails
-	sent := 0
-	failed := 0
-
+func (crd coordinator) Coordinate(ctx context.Context) {
+	wg := sync.WaitGroup{}
 	// Start strats
-	// No way to stop
+	wg.Add(3)
 	go func() {
 		for {
-			strat := lb.NextStrategy()
-			if strat != nil {
-				go strat.Download() // puts startegy into ready and waiting
-				lb.increaseCount(strat)
-				fmt.Println("started a strat")
+			time.Sleep(time.Millisecond * 500)
+			select {
+			case <-ctx.Done():
+				wg.Done()
+				return
+			default:
+				strat := crd.lb.NextStrategy()
+				if strat != nil {
+					go strat.Download() // puts startegy into ready and waiting
+					crd.lb.increaseCount(strat)
+				}
 			}
 		}
 	}()
@@ -39,40 +45,33 @@ func Coordinate(lb loadBalancer, ws workScheduler, d chan interfaces.Work) {
 	// Create and dispatch work
 	go func() {
 		for {
-			work := ws.GetWork()
-			go work.Do()
-			sent++
+			time.Sleep(time.Millisecond * 500)
+			select {
+			case <-ctx.Done():
+				wg.Done()
+				return
+			default:
+				crd.ws.GetWork()
+			}
 		}
 	}()
 
 	// Return work
 	go func() {
 		for {
-			returnedWork := <-d
-			lb.decreaseCount(returnedWork.GetStrategy())
-			ws.Return(returnedWork)
+			time.Sleep(time.Millisecond * 500)
+			select {
+			case <-ctx.Done():
+				wg.Done()
+				return
+			default:
+				returnedWork := <-crd.ch
+				crd.lb.decreaseCount(returnedWork.GetStrategy())
+				crd.ws.Return(returnedWork)
 
+			}
 		}
 	}()
-	time.Sleep(time.Second * 6)
-	fmt.Println(sent, failed)
-}
 
-func mainCoordinate() {
-	// create bitfield
-	bytearray := make([]byte, 100000)
-	bf := bitfield.Bitfield{
-		Bitfield: bytearray,
-	}
-	strat := httpDownload.NewMirrorDownload(123456789, 1234)
-	d := strat.ReturnWorkChannel()
-
-	cc := NewConnectionFactory([]string{"http://example.com"}, nil, "")
-
-	ws := NewBasicScheduler(&bf, cc)
-	ws.AddStrategyToWork(strat, &AbstractWork{})
-	lb := NewBasicLoadBalancer()
-	lb.AddStrategy(strat, 10)
-
-	Coordinate(lb, ws, d)
+	wg.Wait()
 }

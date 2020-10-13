@@ -1,11 +1,11 @@
 package torrent
 
 import (
-	bencode "github.com/jackpal/bencode-go"
-	"io"
-
 	"bytes"
 	"crypto/sha1"
+	bencode "github.com/jackpal/bencode-go"
+	"io"
+	"log"
 )
 
 // MetaInfo represents the bencoded information in a torrent file
@@ -64,6 +64,35 @@ func (m *MetaInfo) Length() int {
 	return m.Info.Length
 }
 
+func (m *MetaInfo) Pieces() int {
+	return int(float64(m.Info.Length) / float64(m.Info.PieceLength))
+
+}
+
 func (m *MetaInfo) PieceLength() int {
 	return m.Info.PieceLength
+}
+
+func (m *MetaInfo) PieceHashes() [][]byte {
+	//pieces := m.Pieces()
+	// could speed up with static allocation
+	pieceHashes := make([][]byte, 0)
+	buf := bytes.NewBufferString(m.Info.Pieces)
+
+	var err error
+	for err != io.EOF {
+		hash := make([]byte, 20)
+		n, err := buf.Read(hash)
+		if err == io.EOF {
+			break
+		}
+		if err != nil || n != 20 {
+			log.Fatal(err, n)
+			return nil // overly dramatic
+		}
+		pieceHashes = append(pieceHashes, hash)
+	}
+
+	return pieceHashes
+
 }

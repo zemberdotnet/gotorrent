@@ -1,25 +1,25 @@
 package bitfield
 
 import (
+	"fmt"
 	"math"
 )
 
-// Credit github.com/veggiedefender - Adding liscence next commit
-
-// A Bitfield represents the pieces that a peer has
-
 type Bitfield struct {
-	Bitfield        []byte
-	PiecesAvailable []byte
-	counts          []byte
+	Bitfield        []byte // used across the dowload
+	PiecesAvailable []byte // used in rarest-first
+	counts          []byte // used in rarest-first
+	Pieces          int
 }
 
+// NewBitfield creates a new bitfield of size n/8 to represent all the pieces
 func NewBitfield(pieces int) *Bitfield {
 
 	b := make([]byte, int(math.Ceil(float64(pieces)/8)))
 
 	return &Bitfield{
 		Bitfield: b,
+		Pieces:   pieces,
 	}
 
 }
@@ -38,59 +38,65 @@ func (bf *Bitfield) SetPiece(index int) {
 	bf.Bitfield[byteIndex] |= 1 << (7 - offset)
 }
 
-func (bf *Bitfield) SetPieces(index, length int) {
-	// this could cause problems
-	for i := index; i <= index+length; i++ {
+// SetPieceRange sets pieces from index to index+length
+func (bf *Bitfield) SetPieceRange(index, length int) {
+	for i := index; i <= index+length-1; i++ {
 		byteIndex := i / 8
 		offset := i % 8
 		bf.Bitfield[byteIndex] |= 1 << (7 - offset)
 	}
 }
 
-func (bf *Bitfield) UnsetPieces(index, length int) {
-	for i := index; i <= index+length; i++ {
+// UnsetPieceRange unsets pieces from index to index+length
+func (bf *Bitfield) UnsetPieceRange(index, length int) {
+	for i := index; i <= index+length-1; i++ {
 		byteIndex := i / 8
 		offset := i % 8
-		bf.Bitfield[byteIndex] |= 0 << (7 - offset)
+		bf.Bitfield[byteIndex] &= 0 << (7 - offset)
 	}
 }
 
-// could organize pieces by number of peers that have that piece
-// implementation pending
+// NextRarestPiece will be the main way of identifying what piece to download
+// in a BitTorrent strategy
 func (b *Bitfield) NextRarestPiece() (index int) {
 	return 0
 }
 
-// we can consider there is only two cases, each time we must search n
-// elements
-// n will be pieces
-// until we can find something better this is what we are doing
-func (b *Bitfield) LargestGap() (x int, y int) {
+// LargestGap returns the next largestGap in a bitfield
+// Used by the httpDownload strategy
+func (b *Bitfield) LargestGap() (index int, length int) {
+	// A linear search is reasonably fast because we search 1/8 values
+	// Could become more granular in the future, but I don't think it's
+	// very necessary
 	largestGap := 0
-	temp := 0
+	index = 0
+	currentGap := 0
 	for i, e := range b.Bitfield {
-		if largestGap == 0 && e == 0 {
-			temp = i
-			largestGap++
-			continue
-		}
-
 		if e == 0 {
-			continue
-			//	largestGap++
-		} else if e != 0 {
-			if i-temp > largestGap {
-				largestGap = i - temp
-				x = temp
-				temp = i
+			currentGap += 1
+		} else {
+			if currentGap > largestGap {
+				largestGap = currentGap
+				index = i - currentGap
+				currentGap = 0
 			}
 		}
 	}
-	if len(b.Bitfield)-1-temp > largestGap {
 
-		largestGap = len(b.Bitfield) - 1 - temp
-		x = temp
+	// one last check for empty arrays
+	if currentGap > largestGap {
+		largestGap = currentGap
+		index = len(b.Bitfield) - currentGap
 	}
 
-	return x, largestGap
+	// handling edge case around the last pieces
+	if index*8 > b.Pieces {
+		index = 0
+		largestGap = 0
+	} else if index*8+largestGap*8 > b.Pieces {
+		largestGap = b.Pieces - index*8
+		return index * 8, largestGap
+	}
+
+	return index * 8, largestGap * 8
 }

@@ -8,14 +8,16 @@ import (
 	"net"
 )
 
+// AbstractConn is a connection that can serve strategies of all types
 type AbstractConn struct {
 	conn   net.Conn
-	bt     bitfield.Bitfield
+	bt     bitfield.Bitfield //Adding in Bitfield to manage BitTorrent rarest-first
 	status int
 	url    bool
 	drop   bool
 }
 
+// ConnCreator implements the interfaces.ConnectionCreator
 type ConnCreator struct {
 	URLSource  []string
 	PeerSource []peer.Peer
@@ -23,7 +25,7 @@ type ConnCreator struct {
 	Active     []interfaces.Connection
 }
 
-// this is probably more tightly coupled than we'd like
+// NewConnectionFactory creates a new connection factory for the strategies to use
 func NewConnectionFactory(urlSource []string, peerSource []peer.Peer, FileExt string) interfaces.ConnectionCreator {
 	return &ConnCreator{
 		URLSource:  urlSource,
@@ -34,10 +36,11 @@ func NewConnectionFactory(urlSource []string, peerSource []peer.Peer, FileExt st
 
 func (cc *ConnCreator) GetConnection(s interfaces.Strategy) interfaces.Connection {
 	if len(cc.Active) == 0 {
-		// should probably recycle these connections
+
+		// TODO: Recycle URL connection
+		// TODO: If we make this part more robust cases than we can decouple to a greater degree
+
 		if s.URL() {
-			// it will break down here if this is nil so we should work on this
-			// we can improve by not copying / setting up a better queue
 			if len(cc.URLSource) > 0 {
 				var pop string
 				cc.URLSource, pop = cc.URLSource[0:len(cc.URLSource)-1], cc.URLSource[len(cc.URLSource)-1]
@@ -46,14 +49,13 @@ func (cc *ConnCreator) GetConnection(s interfaces.Strategy) interfaces.Connectio
 					FileExt: cc.FileExt,
 				}
 			}
-			// Create using URL strategy
 
 		} else {
-			// Create using BitTorrent strategy
-
+			// TODO: Create connections for BitTorrent
 		}
 
 	} else {
+		// TODO: Implement recylced connections
 		if s.URL() {
 
 		} else {
@@ -64,5 +66,5 @@ func (cc *ConnCreator) GetConnection(s interfaces.Strategy) interfaces.Connectio
 }
 
 func (cc *ConnCreator) ReturnConnection(interfaces.Connection) {
-
+	//TODO: Return connections to be recylced
 }
