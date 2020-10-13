@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"fmt"
 	"github.com/zemberdotnet/gotorrent/bitfield"
 	"github.com/zemberdotnet/gotorrent/coordinator"
 	"github.com/zemberdotnet/gotorrent/httpDownload"
@@ -74,7 +73,6 @@ func (c *Client) CreateConnCreatorFromStrategies(strats []interfaces.Strategy) i
 func (c *Client) Coordinate() {
 
 	hashes := c.MetaInfo.PieceHashes()
-	fmt.Println(len(hashes))
 
 	pieceChan := make(chan interface{})
 
@@ -95,7 +93,7 @@ func (c *Client) Coordinate() {
 		ws.AddStrategyToWork(strategy, &coordinator.AbstractWork{})
 		lb.AddStrategy(strategy, 30)
 	}
-	// might be good to make a coordinator object
+
 	coordinator := coordinator.NewCoordinator(lb, ws, workChan)
 
 	ctx, cancel := context.WithCancel(context.Background())

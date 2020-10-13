@@ -5,9 +5,7 @@ import (
 	"github.com/zemberdotnet/gotorrent/interfaces"
 )
 
-// Download is under heavy construction. I do not plan to retain this file as it is, but
-// it served as a Proof of Concept. It succesfully downloaded files under good conditions.
-// Now I plan to break this file into other packages/parts and make everything more elegant
+var PieceLength int
 
 type mirrorDownload struct {
 	fileLength         int
@@ -17,7 +15,10 @@ type mirrorDownload struct {
 	returnWorkChannel  chan interfaces.Work
 }
 
+// NewMirrorDownload reaturns a pointer to a mirrorDownload which is a implementation
+// of interfaces.Strategy
 func NewMirrorDownload(fileLength, pieceLength int) *mirrorDownload {
+	PieceLength = pieceLength
 	recv := make(chan interfaces.Work, 30)
 	rtrn := make(chan interfaces.Work)
 	return &mirrorDownload{
@@ -28,7 +29,7 @@ func NewMirrorDownload(fileLength, pieceLength int) *mirrorDownload {
 	}
 }
 
-// maybe piece import here
+// These methods provide cross-channel communication
 func (d *mirrorDownload) SetPieceChannel(c chan interface{}) {
 	d.pieceChannel = c
 }
@@ -53,6 +54,7 @@ func (d *mirrorDownload) PieceChannel() chan interface{} {
 	return d.pieceChannel
 }
 
+// These define properties to help generate work and pieces for the strategy
 func (d *mirrorDownload) Multipiece() bool {
 	return true
 }
@@ -61,28 +63,39 @@ func (d *mirrorDownload) URL() bool {
 	return true
 }
 
-// Very crude, but succesfully downloads as a Proof of Concept
+// Download is the main method for the httpDownload strategy
+// it recieves work, attempts to download it, and sends the piece
+// to the filebuilder
 func (d mirrorDownload) Download() {
-	// get the next best piece to download
-	// download the next best piece
 
 	work := <-d.recieveWorkChannel
 	var conn interfaces.Connection
-	// You will regret this
-	// TODO MUST CHANGE OR WILL FREEZE IN CERTAIN CASES!!!!
+
+	piece := work.GetPiece()
+	if piece == nil {
+		d.returnWorkChannel <- work
+		return
+	}
+
 	for conn == nil {
 		conn = work.GetConnection()
 	}
 
-	b, err := conn.AttemptDownloadPiece(work.GetPiece())
+	b, err := conn.AttemptDownloadPiece(piece)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Printf("Error while downloading piece:%v\n", err)
+		d.pieceChannel <- piece
+		d.returnWorkChannel <- work
+		return
 	}
-	fmt.Println(string(b))
+	_, err = piece.Write(b)
+	if err != nil {
+		fmt.Printf("Failed writing bytes to piece")
+		d.pieceChannel <- piece
+		d.returnWorkChannel <- work
+		return
+	}
 
-	//	fmt.Println(work.GetTask())
-
-	//fmt.Println(work)
+	d.pieceChannel <- piece
 	d.returnWorkChannel <- work
-	// Go do things
 }

@@ -42,6 +42,7 @@ func (f *File) WriteToFile(end context.CancelFunc, path string) {
 						// this will go later
 						fmt.Println("Piece already downloaded")
 						f.Bitfield.SetPieceRange(piece.(interfaces.Piece).Index(), piece.(interfaces.Piece).Length())
+						continue
 					}
 					fmt.Printf("Finished %v of %v pieces.\n", finishedPieces, f.Bitfield.Pieces)
 				} else {

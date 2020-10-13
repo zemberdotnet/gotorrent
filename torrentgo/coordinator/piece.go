@@ -87,10 +87,10 @@ func PieceFactory(bt *bitfield.Bitfield, hashes [][]byte) func(multi bool) inter
 		if multi {
 
 			wlock.Lock()
-			defer wlock.Unlock()
 
 			index, length := bt.LargestGap()
 			if length == 0 {
+				wlock.Unlock()
 				return nil
 			}
 			// The max-dl size is the trade-off
@@ -108,9 +108,7 @@ func PieceFactory(bt *bitfield.Bitfield, hashes [][]byte) func(multi bool) inter
 				newHashes = append(newHashes, hashes[index+i])
 
 			}
-			fmt.Println(newHashes)
-			fmt.Println(hashes[index : index+length])
-
+			wlock.Unlock()
 			return &abstractPiece{
 				index:  index,
 				length: length,
