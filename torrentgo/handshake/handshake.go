@@ -11,6 +11,11 @@ type Handshake struct {
 	Pstr     []byte
 }
 
+func NewEmptyHandshake() *Handshake {
+	return &Handshake{}
+}
+
+
 // NewHandshake creates a new Handshake from a hash and peerID.
 // It currently uses a hardcoded Pstr. This can be changed later as
 // the client is updated

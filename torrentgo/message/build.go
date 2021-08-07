@@ -1,4 +1,4 @@
-package messages
+package message
 
 import (
 	"encoding/binary"
@@ -6,8 +6,13 @@ import (
 )
 
 // TODO
-func (m *message) WriteTo(w io.Writer) (n int64, err error) {
+func (m *Message) WriteTo(w io.Writer) (n int64, err error) {
 	return 0, nil
+}
+
+func (m *Message) Serialize() []byte {
+	// TODO
+	return nil
 }
 
 // we could map these messages for quicker access

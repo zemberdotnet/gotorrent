@@ -2,10 +2,11 @@ package httpDownload
 
 import (
 	"bytes"
-	"github.com/zemberdotnet/gotorrent/interfaces"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/zemberdotnet/gotorrent/interfaces"
 )
 
 // buildRequest creates a http range request to download pieces

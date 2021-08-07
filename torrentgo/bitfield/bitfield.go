@@ -4,55 +4,65 @@ import (
 	"math"
 )
 
-type Bitfield struct {
-	Bitfield        []byte // used across the dowload
-	PiecesAvailable []byte // used in rarest-first
-	counts          []byte // used in rarest-first
-	Pieces          int
-}
+type Bitfield []byte // used across the dowload
 
 // NewBitfield creates a new bitfield of size n/8 to represent all the pieces
-func NewBitfield(pieces int) *Bitfield {
+func NewBitfield(pieces int) Bitfield {
+	return make([]byte, int(math.Ceil(float64(pieces)/8)))
+}
 
-	b := make([]byte, int(math.Ceil(float64(pieces)/8)))
-
-	return &Bitfield{
-		Bitfield: b,
-		Pieces:   pieces,
-	}
-
+func NewBitfieldFromBytes(b []byte) Bitfield {
+	return Bitfield(b)
 }
 
 // HasPiece tells if a bitfield has a particular index set
-func (bf *Bitfield) HasPiece(index int) bool {
+func (bf Bitfield) HasPiece(index int) bool {
 	byteIndex := index / 8
 	offset := index % 8
-	return bf.Bitfield[byteIndex]>>(7-offset)&1 != 0
+	return bf[byteIndex]>>(7-offset)&1 != 0
 }
 
 // SetPiece sets a bit in the bitfield
-func (bf *Bitfield) SetPiece(index int) {
+func (bf Bitfield) SetPiece(index int) {
 	byteIndex := index / 8
 	offset := index % 8
-	bf.Bitfield[byteIndex] |= 1 << (7 - offset)
+	bf[byteIndex] |= 1 << (7 - offset)
 }
 
 // SetPieceRange sets pieces from index to index+length
-func (bf *Bitfield) SetPieceRange(index, length int) {
+func (bf Bitfield) SetPieceRange(index, length int) {
 	for i := index; i <= index+length-1; i++ {
 		byteIndex := i / 8
 		offset := i % 8
-		bf.Bitfield[byteIndex] |= 1 << (7 - offset)
+		bf[byteIndex] |= 1 << (7 - offset)
 	}
 }
 
 // UnsetPieceRange unsets pieces from index to index+length
-func (bf *Bitfield) UnsetPieceRange(index, length int) {
+func (bf Bitfield) UnsetPieceRange(index, length int) {
 	for i := index; i <= index+length-1; i++ {
 		byteIndex := i / 8
 		offset := i % 8
-		bf.Bitfield[byteIndex] &= 0 << (7 - offset)
+		bf[byteIndex] &= 0 << (7 - offset)
 	}
+}
+
+// TODO Consider where we will do the bounds checking?
+// Here or elsewhere
+/*
+func (b *Bitfield) ParseBitfieldIntoCounts(bt []byte) {
+	recvBitfield := NewBitfieldFromBytes(bt, b.Pieces)
+	for i := 0; i < b.Pieces; i++ {
+
+		if recvBitfield.HasPiece(i) {
+			b.IncreaseCount(i)
+		}
+
+	}
+}
+
+func (b *Bitfield) IncreaseCount(index int) {
+	b.Counts[index]++
 }
 
 // NextRarestPiece will be the main way of identifying what piece to download
@@ -99,3 +109,4 @@ func (b *Bitfield) LargestGap() (index int, length int) {
 
 	return index * 8, largestGap * 8
 }
+*/

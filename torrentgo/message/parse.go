@@ -1,10 +1,14 @@
-package messages
+package message
 
 import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"net"
 )
+
+// TODO Are go functions stored as pointers?
+// important for messageParser type
 
 // confusing/close names
 var ErrInvalidMessageLength error = errors.New("Invalid Message Length")
@@ -24,7 +28,14 @@ func (e Error) Error() string {
 	return string(e)
 }
 */
+var MessageParser = NewMessageParser()
 
+//var funcs map[int]func([]byte) (*message,error) = NewMessageParser()
+
+// use this type?
+type messageParser map[int]func([]byte) (*Message, error)
+
+/*
 type messageParser struct {
 	funcs map[int]func([]byte) (*message, error)
 }
@@ -36,23 +47,38 @@ func NewMessageParser() *messageParser {
 		funcs: genMessageHandlers(),
 	}
 }
+*/
+func NewMessageParser() messageParser {
+	return genMessageHandlers()
+}
 
-func (m *message) ReadFrom(r io.Reader) (n int64, err error) {
+func (m *Message) ReadFrom(r io.Reader) (n int64, err error) {
 	return 0, nil
 }
 
+func (mp messageParser) ReadMessage(conn net.Conn) (*Message, error) {
+
+	msg, err := io.ReadAll(conn)
+	if err != nil {
+		return nil, err
+	}
+
+	return MessageParser.ParseMessage(msg)
+
+}
+
 // Parse Message takes in bytes, reads the messageID and calls the parsing function
-func (mp *messageParser) ParseMessage(b []byte) (m *message, err error) {
-	var parser func([]byte) (*message, error)
+func (mp messageParser) ParseMessage(b []byte) (m *Message, err error) {
+	var parser func([]byte) (*Message, error)
 	if len(b) <= 4 {
-		parser = mp.funcs[MsgKeepAlive]
+		parser = mp[MsgKeepAlive]
 		m, err = parser(b)
 		if err != nil {
 			return
 		}
 		return
 	} else {
-		parser, ok := mp.funcs[int(b[4])]
+		parser, ok := mp[int(b[4])]
 		if !ok {
 			return nil, ErrInvalidMessageID
 		}
@@ -73,15 +99,15 @@ func (mp *messageParser) ParseMessage(b []byte) (m *message, err error) {
 
 // Error handling
 // Not adding handling for invalid IDs because those should be filtered at highest level
-func parseBasicMessage(b []byte) (m *message, err error) {
+func parseBasicMessage(b []byte) (m *Message, err error) {
 	if len(b) == 4 {
-		m = &message{
-			messageID: MsgKeepAlive,
+		m = &Message{
+			MessageID: MsgKeepAlive,
 		}
 
 	} else if len(b) == 5 {
-		m = &message{
-			messageID: int(b[4]),
+		m = &Message{
+			MessageID: int(b[4]),
 		}
 
 	} else {
@@ -90,7 +116,7 @@ func parseBasicMessage(b []byte) (m *message, err error) {
 	return
 }
 
-func parseHaveMessage(b []byte) (m *message, err error) {
+func parseHaveMessage(b []byte) (m *Message, err error) {
 	if len(b) != 9 {
 		return nil, ErrInvalidMessageLength
 	}
@@ -99,15 +125,15 @@ func parseHaveMessage(b []byte) (m *message, err error) {
 		return nil, ErrInvalidLength
 	}
 
-	m = &message{
-		messageID: MsgHave,
-		index:     int(binary.BigEndian.Uint32(b[5:9])),
+	m = &Message{
+		MessageID: MsgHave,
+		Index:     int(binary.BigEndian.Uint32(b[5:9])),
 	}
 	return
 }
 
 // at a higher level we need to check if bitfield matches expected length
-func parseBitfieldMessage(b []byte) (m *message, err error) {
+func parseBitfieldMessage(b []byte) (m *Message, err error) {
 	// 4 byte length, message id, 1 piece
 	if len(b) < 6 {
 		return nil, ErrInvalidMessageLength
@@ -116,15 +142,15 @@ func parseBitfieldMessage(b []byte) (m *message, err error) {
 	if len(b)-4 != int(length) {
 		return nil, ErrInvalidLength
 	}
-	m = &message{
-		messageID: MsgBitfield,
-		piece:     b[5:],
+	m = &Message{
+		MessageID: MsgBitfield,
+		Payload:   b[5:],
 	}
 	return
 
 }
 
-func parsePieceMessage(b []byte) (m *message, err error) {
+func parsePieceMessage(b []byte) (m *Message, err error) {
 	// length, message id, index, begin, block
 	if len(b) < 14 {
 		return nil, ErrInvalidMessageLength
@@ -133,11 +159,11 @@ func parsePieceMessage(b []byte) (m *message, err error) {
 	if len(b)-4 != int(length) {
 		return nil, ErrInvalidLength
 	}
-	m = &message{
-		messageID: MsgPiece,
-		index:     int(binary.BigEndian.Uint32(b[5:9])),
-		begin:     int(binary.BigEndian.Uint32(b[9:13])),
-		piece:     b[13:],
+	m = &Message{
+		MessageID: MsgPiece,
+		Index:     int(binary.BigEndian.Uint32(b[5:9])),
+		Begin:     int(binary.BigEndian.Uint32(b[9:13])),
+		Payload:   b[13:],
 	}
 	return
 
@@ -145,33 +171,33 @@ func parsePieceMessage(b []byte) (m *message, err error) {
 
 // Don't know if named variables are best here since we are actually init
 // in helper function
-func parseRequestMessage(b []byte) (*message, error) {
+func parseRequestMessage(b []byte) (*Message, error) {
 	return cancelAndRequestParser(b)
 }
 
-func parseCancelMessage(b []byte) (*message, error) {
+func parseCancelMessage(b []byte) (*Message, error) {
 	return cancelAndRequestParser(b)
 }
 
-func cancelAndRequestParser(b []byte) (m *message, err error) {
+func cancelAndRequestParser(b []byte) (m *Message, err error) {
 	if len(b) != 17 {
 		return nil, ErrInvalidMessageLength
 	}
 	if b[3] != 13 {
 		return nil, ErrInvalidLength
 	}
-	m = &message{
-		messageID: int(b[4]),
-		index:     int(binary.BigEndian.Uint32(b[5:9])),
-		begin:     int(binary.BigEndian.Uint32(b[9:13])),
-		length:    int(binary.BigEndian.Uint32(b[13:17])),
+	m = &Message{
+		MessageID: int(b[4]),
+		Index:     int(binary.BigEndian.Uint32(b[5:9])),
+		Begin:     int(binary.BigEndian.Uint32(b[9:13])),
+		Length:    int(binary.BigEndian.Uint32(b[13:17])),
 	}
 
 	return
 }
 
-func genMessageHandlers() map[int]func([]byte) (*message, error) {
-	return map[int]func([]byte) (*message, error){
+func genMessageHandlers() map[int]func([]byte) (*Message, error) {
+	return map[int]func([]byte) (*Message, error){
 		MsgKeepAlive:     parseBasicMessage,
 		MsgChoke:         parseBasicMessage,
 		MsgUnchoke:       parseBasicMessage,

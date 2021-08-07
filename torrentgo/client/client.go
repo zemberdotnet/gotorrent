@@ -2,6 +2,9 @@ package client
 
 import (
 	"context"
+	"log"
+	"os"
+
 	"github.com/zemberdotnet/gotorrent/bitfield"
 	"github.com/zemberdotnet/gotorrent/coordinator"
 	"github.com/zemberdotnet/gotorrent/httpDownload"
@@ -11,8 +14,6 @@ import (
 	"github.com/zemberdotnet/gotorrent/piece"
 	"github.com/zemberdotnet/gotorrent/torrent"
 	"github.com/zemberdotnet/gotorrent/tracker"
-	"log"
-	"os"
 )
 
 // Client represents one torrent download

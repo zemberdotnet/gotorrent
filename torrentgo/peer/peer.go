@@ -2,25 +2,32 @@ package peer
 
 import (
 	"errors"
-	"github.com/zemberdotnet/gotorrent/bitfield"
+	"fmt"
 	"net"
 	"strconv"
+
+	"github.com/zemberdotnet/gotorrent/bitfield"
 )
 
-type Peer struct {
+// maybe we change this a little
+type Peer interface {
+	fmt.Stringer
+}
+
+type TorrPeer struct {
 	IP       net.IP
 	Port     uint16
 	Bitfield bitfield.Bitfield
 }
 
-func ParsePeers(s string) (p []Peer, e error) {
+func ParseTorrPeers(s string) (p []Peer, e error) {
 	if len(s)%6 != 0 {
 		return nil, errors.New("Invalid compact response from tracker")
 	}
 	Peers := make([]Peer, 0)
 	b := []byte(s)
 	for i := 0; i < len(b)-6; i++ {
-		peer := Peer{
+		peer := TorrPeer{
 			IP:   net.IPv4(b[i], b[i+1], b[i+2], b[i+3]),
 			Port: concatenate(b[i+4], b[i+5]),
 		}
@@ -39,6 +46,6 @@ func concatenate(x, y byte) uint16 {
 	return uint16(i*pow + j)
 }
 
-func (p Peer) String() string {
+func (p TorrPeer) String() string {
 	return p.IP.String() + ":" + strconv.Itoa(int(p.Port))
 }

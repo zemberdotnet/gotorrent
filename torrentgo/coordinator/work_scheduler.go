@@ -1,107 +1,68 @@
 package coordinator
 
 import (
-	"github.com/zemberdotnet/gotorrent/bitfield"
+	"container/heap"
+	"sync"
+
 	"github.com/zemberdotnet/gotorrent/interfaces"
-	"math"
+	"github.com/zemberdotnet/gotorrent/piece"
+	"github.com/zemberdotnet/gotorrent/state"
 )
 
-// A better implementation may be pulling apart the scheduling and
-// production of work
-
-type workScheduler interface {
-	//Schedule(interfaces.Strategy)
-	GetWork() interfaces.Work
-	Return(interfaces.Work)
+type WorkScheduler struct {
+	state *state.TorrentState
+	// finding piece quickly
+	// we can use this to update count then call Fix
+	workQueue chan piece.Piece
+	// selecting rarest piece
+	PieceHeap *piece.PieceHeap
+	lock      *sync.RWMutex
 }
 
-type BasicScheduler struct {
-	workChan       chan interfaces.Work
-	strategyToWork map[interfaces.Strategy]interfaces.Work
-	pieceFactory   func(bool) interfaces.Piece
-	connCreator    interfaces.ConnectionCreator
-	bitfield       *bitfield.Bitfield
-}
-
-func NewBasicScheduler(bt *bitfield.Bitfield, cc interfaces.ConnectionCreator, hashes [][]byte) *BasicScheduler {
-	c := make(chan interfaces.Work)
-	s := make(map[interfaces.Strategy]interfaces.Work)
-
-	return &BasicScheduler{
-		workChan:       c,
-		strategyToWork: s,
-		pieceFactory:   PieceFactory(bt, hashes),
-		connCreator:    cc,
-		bitfield:       bt,
-	}
-}
-
-func (b *BasicScheduler) AddStrategyToWork(s interfaces.Strategy, w interfaces.Work) {
-	b.strategyToWork[s] = w
-}
-
-// Placeholder
-func (b *BasicScheduler) Return(w interfaces.Work) {
-}
-
-// GetWork wraps around generateWork and sends the work to the channel if its not full
-// If the queue is full then we throw away the piece and unset it in the bitfield
-func (b *BasicScheduler) GetWork() interfaces.Work {
-	work := b.generateWork()
-	if work == nil {
-		return nil
-	}
-
-	select {
-	case work.GetStrategy().RecieveWorkChannel() <- work:
-	default:
-		b.bitfield.UnsetPieceRange(work.GetPiece().Index(), work.GetPiece().Length())
-
-	}
-
-	return work
-}
-
-// generateWork choses the strategy to generate work for
-func (b *BasicScheduler) generateWork() interfaces.Work {
-	var minStrat interfaces.Strategy
-	var minQueueSize int = math.MaxInt64
-
-	// An alternative for the future is doling out the work here
-	// This would make sending on the channel easier
-
-	for k, _ := range b.strategyToWork {
-		if minStrat == nil {
-			minStrat = k
-			minQueueSize = len(k.RecieveWorkChannel())
-		}
-
-		if len(k.RecieveWorkChannel()) < minQueueSize {
-			minQueueSize = len(k.RecieveWorkChannel())
-			minStrat = k
+// need to scan connection pool
+//
+func (ws *WorkScheduler) Schedule() {
+	// first scan the counts
+	// and go thru pieceheap updating and fixing
+	// we have to do this to use Fix anyway
+	ws.lock.Lock()
+	defer ws.lock.Unlock()
+	// looking at a n*log(n) here
+	for i := 0; i < ws.PieceHeap.Len(); i++ {
+		e := ws.PieceHeap.Get(i)
+		if e.Count != ws.state.Counts[e.Index()] {
+			e.Count = ws.state.Counts[e.Index()]
+			heap.Fix(ws.PieceHeap, i)
 		}
 	}
 
-	return b.NewWorkFromStrategy(minStrat)
+	// I am worried about races here
+	for len(ws.workQueue)+ws.state.InProcess() < cap(ws.workQueue) {
+		ws.workQueue <- ws.GeneratePiece()
+	}
+
 }
 
-func (b *BasicScheduler) NewWorkFromStrategy(s interfaces.Strategy) interfaces.Work {
-	if s.Multipiece() {
-		piece := b.pieceFactory(true)
-		if piece == nil {
-			return nil
-		}
-
-		return &AbstractWork{
-			strategy: s,
-			piece:    piece,
-			conn:     b.connCreator,
-		}
-	} else {
-		return &AbstractWork{
-			strategy: s,
-			piece:    b.pieceFactory(false),
-			conn:     b.connCreator,
-		}
+func NewWorkScheduler() *WorkScheduler {
+	return &WorkScheduler{
+		PieceHeap: new(piece.PieceHeap),
 	}
+}
+
+func (ws *WorkScheduler) SendPiece(strat interfaces.Strategy) {
+
+}
+
+// while its not perfect abstraction, multipiece is only called on
+// strategies where connections have all pieces available
+func (ws *WorkScheduler) GenerateMultipiece() []*piece.Piece {
+	// simple linear search on bitfield
+	return nil
+}
+
+func (ws *WorkScheduler) GeneratePiece() piece.Piece {
+	if ws.PieceHeap.Len() > 0 {
+		return heap.Pop(ws.PieceHeap).(piece.Piece)
+	}
+	return nil
 }

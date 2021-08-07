@@ -1,4 +1,4 @@
-package piece
+package filebuilder
 
 import (
 	"bufio"

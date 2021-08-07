@@ -1,5 +1,0 @@
-package coordinator
-
-import (
-//	"testing"
-)

@@ -2,6 +2,7 @@ package httpDownload
 
 import (
 	"fmt"
+
 	"github.com/zemberdotnet/gotorrent/interfaces"
 )
 

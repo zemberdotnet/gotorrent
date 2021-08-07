@@ -1,69 +1,35 @@
 package p2p
 
 import (
+	"github.com/zemberdotnet/gotorrent/connection"
 	"github.com/zemberdotnet/gotorrent/interfaces"
+	"github.com/zemberdotnet/gotorrent/piece"
+	"github.com/zemberdotnet/gotorrent/state"
 )
 
-// 16kb
-const BlockSize = 16384
-
-var (
-	_ interfaces.Strategy = &TorrentDL{}
-)
-
-type TorrentDL struct {
-	fileLength      int
-	pieceLength     int
-	pieceChan       chan interface{}
-	recieveWorkChan chan interfaces.Work
-	returnWorkChan  chan interfaces.Work
+type P2P struct {
+	state     *state.TorrentState
+	connPool  connection.ConnectionPool
+	pieceChan chan *piece.TorrPiece
 }
 
-func NewTorrentDownload(fileLength int) *TorrentDL {
-	recv := make(chan interfaces.Work, 30)
-	rtrn := make(chan interfaces.Work)
-	return &TorrentDL{
-		fileLength:      fileLength,
-		recieveWorkChan: recv,
-		returnWorkChan:  rtrn,
-	}
+func (p *P2P) Start() {
+
 }
 
-func (d *TorrentDL) Download() {
-	work := <-d.recieveWorkChan
-	// once again this is bad
-	var conn interfaces.Connection
-	for conn == nil {
-		conn = work.GetConnection()
-	}
-	conn.Dial()
-	conn.AttemptDownloadPiece(work.GetPiece())
-}
-
-func (d *TorrentDL) SetReturnChannel(w chan interfaces.Work) {
-	d.returnWorkChan = w
-}
-
-func (d *TorrentDL) RecieveWorkChannel() chan interfaces.Work {
-	return d.recieveWorkChan
-}
-
-func (d *TorrentDL) ReturnWorkChannel() chan interfaces.Work {
-	return d.returnWorkChan
-}
-
-func (d *TorrentDL) SetPieceChannel(c chan interface{}) {
-	d.pieceChan = c
-}
-
-func (d *TorrentDL) PieceChannel() chan interface{} {
-	return d.pieceChan
-}
-
-func (d *TorrentDL) Multipiece() bool {
+func (p *P2P) URL() bool {
 	return false
 }
 
-func (d *TorrentDL) URL() bool {
+func (p *P2P) Multipiece() bool {
 	return false
+}
+
+func NewP2PFactory(cp connection.ConnectionPool, ch chan *piece.TorrPiece) func() interfaces.Strategy {
+	return func() interfaces.Strategy {
+		return &P2P{
+			connPool:  cp,
+			pieceChan: ch,
+		}
+	}
 }
