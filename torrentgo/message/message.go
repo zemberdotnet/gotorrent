@@ -31,6 +31,19 @@ const (
 )
 
 func ReadMessage(r io.Reader) (msg *Message, err error) {
-	return nil, nil
+	buf, err := io.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
 
+	return MessageParser.ParseMessage(buf)
+}
+
+func SendMessage(w io.Writer, msg *Message) (err error) {
+	buf := msg.Serialize()
+	_, err = w.Write(buf)
+	if err != nil {
+		return err
+	}
+	return nil
 }

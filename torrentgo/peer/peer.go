@@ -47,5 +47,5 @@ func concatenate(x, y byte) uint16 {
 }
 
 func (p TorrPeer) String() string {
-	return p.IP.String() + ":" + strconv.Itoa(int(p.Port))
+	return net.JoinHostPort(p.IP.String(), strconv.Itoa(int(p.Port)))
 }

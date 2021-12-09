@@ -2,23 +2,30 @@ package connection
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/zemberdotnet/gotorrent/peer"
 )
 
+// TODO Abstraction
+// Here we have an opportunity to make Conneciton more abstract if we need it
+// essentially everywhere there is a *PeerConn we could use an interface of
+// Connection
+
 type ConnectionPool struct {
 	Peers       []peer.Peer
-	connFactory func(peer.Peer) Connection
-	connections chan Connection
+	connFactory func(peer.Peer) *PeerConn
+	connections chan *PeerConn
 	activeConns int
 	lock        *sync.Mutex
 }
 
-func NewConnectionPool(peers []peer.Peer, factory func(peer.Peer) Connection, maxConn int) *ConnectionPool {
+func NewConnectionPool(peers []peer.Peer, factory func(peer.Peer) *PeerConn, maxConn int) *ConnectionPool {
 	return &ConnectionPool{
 		Peers:       peers,
-		connections: make(chan Connection, maxConn),
+		connections: make(chan *PeerConn, maxConn),
+		connFactory: factory,
 		activeConns: 0,
 		lock:        &sync.Mutex{},
 	}
@@ -26,8 +33,14 @@ func NewConnectionPool(peers []peer.Peer, factory func(peer.Peer) Connection, ma
 
 // ReturnConnection puts a connections back into the connection pool
 func (cp *ConnectionPool) ReturnConnection(conn *PeerConn) {
+
 	cp.lock.Lock()
 	defer cp.lock.Unlock()
+	if conn.Err != nil {
+		//TODO better error msg
+		fmt.Println(conn.Err)
+		return
+	}
 	cp.connections <- conn
 }
 
@@ -53,23 +66,27 @@ func (cp *ConnectionPool) AddConnection(conn *PeerConn) bool {
 // Need more testing
 // Should next connection block
 // NextConnection returns the next available function
-func (cp *ConnectionPool) NextConnection() (Connection, error) {
+func (cp *ConnectionPool) NextConnection() (*PeerConn, error) {
 	cp.lock.Lock()
 	defer cp.lock.Unlock()
 
 	if len(cp.connections) > 0 { // if connections on queue
+		fmt.Println("pulling existing connection")
 		return <-cp.connections, nil
 	} else if cp.activeConns < cap(cp.connections) { // if more connections can be made
+		fmt.Println("making new connection")
 		if len(cp.Peers) < 1 {
-			return nil, errors.New("No remaining peers to create connection")
+			return nil, errors.New("no remaining peers")
 		}
 		lastPeer := cp.Peers[len(cp.Peers)-1]
 		cp.Peers = cp.Peers[:len(cp.Peers)-1]
 		cp.activeConns++
+		fmt.Printf("New connection made with %v\n", lastPeer.String())
+
 		return cp.connFactory(lastPeer), nil
 
 	} else {
-		return nil, errors.New("No available connections")
+		return nil, errors.New("no available connections")
 	}
 }
 

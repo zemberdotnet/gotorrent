@@ -2,10 +2,12 @@ package coordinator
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/zemberdotnet/gotorrent/interfaces"
+	"github.com/zemberdotnet/gotorrent/state"
 )
 
 type Coordinator struct {
@@ -15,47 +17,68 @@ type Coordinator struct {
 		total    int
 		max      int
 	}
+	state *state.TorrentState
 }
 
-func NewCoordinator(strats []func() interfaces.Strategy) {
-	// TODO
+func NewCoordinator(state *state.TorrentState, creators []func() interfaces.Strategy) *Coordinator {
+	// TODO make this configurable
+	max := 3
+
+	return &Coordinator{
+		strats: struct {
+			creators []func() interfaces.Strategy
+			next     int
+			total    int
+			max      int
+		}{
+			creators: creators,
+			next:     0,
+			total:    0,
+			max:      max,
+		},
+		state: state,
+	}
 }
 
 func (c *Coordinator) Coordinate(ctx context.Context) {
+	count := 0
 	wg := sync.WaitGroup{}
+	sleepDuration := 100 * time.Millisecond
 	// create strategies
 	go func() {
 		for {
-			time.Sleep(time.Millisecond * 500)
+
+			time.Sleep(sleepDuration)
 			select {
 			case <-ctx.Done():
 				wg.Done()
 				return
 			default:
-				// we trade being more dynamic and abstract
-				// for simplicity and less effort
+				// if we have less strats going than allowed then start more
 				if c.strats.total < c.strats.max {
-					// create strategies
+					count++
+					fmt.Println(count)
+					// if the next pointer on strats is less than the legnth
+					// use it to start otherwise take the pointer back to zero
+					// and iterate through the strats again
 					if c.strats.next < len(c.strats.creators) {
 						strat := c.strats.creators[c.strats.next]()
-						go strat.Start()
+						go strat.Start(ctx)
+						c.strats.total++
 						c.strats.next++
 					} else {
 						c.strats.next = 0
 						strat := c.strats.creators[c.strats.next]()
-						go strat.Start()
+						go strat.Start(ctx)
+						c.strats.total++
 						c.strats.next++
 					}
+				} else {
+					return
 				}
-
 			}
 		}
 	}()
-
-	// start and mange pieces
-	go func() {
-	}()
-
 }
 
 // start piece sending service

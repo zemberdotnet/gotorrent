@@ -2,6 +2,7 @@ package connection
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"time"
 
@@ -16,12 +17,20 @@ type Connection interface {
 
 // PeerConn represents a connection to a Peer
 type PeerConn struct {
-	Conn     net.Conn
-	Choked   bool
-	Bitfield bitfield.Bitfield
-	peer     peer.Peer
-	infoHash [20]byte
-	peerID   [20]byte
+	Conn       net.Conn
+	Choked     bool
+	Interested bool
+	Bitfield   bitfield.Bitfield
+	peer       peer.Peer
+	infoHash   [20]byte
+	peerID     [20]byte
+	Err        error
+}
+
+func DefaultConnectionFactory(infoHash, peerID [20]byte) func(peer.Peer) *PeerConn {
+	return func(peer peer.Peer) *PeerConn {
+		return NewPeerConn(peer, infoHash, peerID)
+	}
 }
 
 // NewPeerConn creates a new __unconnected__ PeerConn
@@ -36,16 +45,36 @@ func NewPeerConn(peer peer.Peer, infoHash, peerID [20]byte) *PeerConn {
 }
 
 func (p *PeerConn) Initialize() error {
-	conn, err := net.DialTimeout("tcp", p.peer.String(), 3*time.Second)
+	fmt.Println("Initializing connection")
+	resolver := &net.Resolver{
+		PreferGo:     true,
+		StrictErrors: true,
+	}
+	dialer := net.Dialer{
+		Timeout:   time.Second * 60,
+		Deadline:  time.Time{},
+		LocalAddr: nil,
+		KeepAlive: 0,
+		Resolver:  resolver,
+	}
+
+	conn, err := dialer.Dial("tcp", p.peer.String())
+	//conn, err := net.DialTimeout("tcp", p.peer.String(), 2*time.Second)
+
 	if err != nil {
-		conn.Close()
+		log.Println("Error connecting to peer:", err)
+		p.Err = err
 		return err
 	}
+	conn.Close()
+	p.Conn = conn
+	fmt.Println("Connected to peer ", p.peer.String())
 
 	// we do not need the response at this time so have
 	_, err = p.Handshake()
 	if err != nil {
 		fmt.Println("error in intialize")
+		p.Err = err
 		p.Conn.Close()
 		return err
 	}
@@ -53,13 +82,15 @@ func (p *PeerConn) Initialize() error {
 	err = p.SetBitfield()
 	if err != nil {
 		fmt.Println("error in intialize")
+		p.Err = err
 		p.Conn.Close()
 		return err
 	}
 
 	// TODO MORE MORE MORE
 
-	return err
+	fmt.Println("Init is good")
+	return nil
 }
 
 // TODO TODO TODO
@@ -110,7 +141,10 @@ func (p *PeerConn) Handshake() (*handshake.Handshake, error) {
 	return resp, err
 }
 
-func (p *PeerConn) ReadMessage() (*message.Message, error) {
+func (p *PeerConn) SendMessage(m *message.Message) error {
+	return nil
+}
 
+func (p *PeerConn) ReadMessage() (*message.Message, error) {
 	return nil, nil
 }

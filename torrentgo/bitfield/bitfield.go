@@ -23,6 +23,7 @@ func (bf Bitfield) HasPiece(index int) bool {
 }
 
 // SetPiece sets a bit in the bitfield
+// Note: we rely on good input
 func (bf Bitfield) SetPiece(index int) {
 	byteIndex := index / 8
 	offset := index % 8

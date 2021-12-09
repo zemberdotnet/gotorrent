@@ -3,16 +3,41 @@ package message
 import (
 	"encoding/binary"
 	"io"
+	"log"
 )
 
 // TODO
 func (m *Message) WriteTo(w io.Writer) (n int64, err error) {
-	return 0, nil
+	buf := m.Serialize()
+	c, err := w.Write(buf)
+	if err != nil {
+		log.Printf("Error writing message: %s\n", err)
+		return
+	}
+	n = int64(c)
+	return n, err
 }
 
 func (m *Message) Serialize() []byte {
-	// TODO
-	return nil
+
+	// This should be a switch statement
+	if m.MessageID == MsgKeepAlive || m.MessageID == MsgChoke || m.MessageID == MsgUnchoke || m.MessageID == MsgInterested || m.MessageID == MsgNotInterested {
+		return BuildBasicMessage(m.MessageID)
+	} else if m.MessageID == MsgHave {
+		return BuildHaveMessage(m.Index)
+	} else if m.MessageID == MsgBitfield {
+		return BuildBitfieldMessage(m.Payload)
+	} else if m.MessageID == MsgRequest {
+		return BuildRequestMessage(m.Index, m.Begin, m.Length)
+	} else if m.MessageID == MsgPiece {
+		return BuildPieceMessage(m.Index, m.Begin, m.Payload)
+	} else if m.MessageID == MsgCancel {
+		return BuildCancelMessage(m.Index, m.Begin, m.Length)
+	} else {
+		log.Println("Unknown message type")
+		return BuildBasicMessage(MsgKeepAlive)
+	}
+
 }
 
 // we could map these messages for quicker access

@@ -1,17 +1,15 @@
 package filebuilder
 
 import (
-	"fmt"
-	"github.com/zemberdotnet/gotorrent/bitfield"
-	"github.com/zemberdotnet/gotorrent/interfaces"
-	"math/rand"
 	"testing"
+
+	"github.com/zemberdotnet/gotorrent/piece"
 )
 
 // implements the piece interface for testing
 
 var (
-	_ interfaces.Piece = TestPiece{}
+	_ piece.Piece = TestPiece{}
 )
 
 type TestPiece struct {
@@ -44,40 +42,5 @@ func (t TestPiece) Read(b []byte) (int, error) {
 }
 
 func TestWriteToFile(t *testing.T) {
-	file := createDefaultFile()
-	go sendPiecesToFile(file.Bitfield, file.pieceChan)
-	file.WriteToFile("/dev/null")
-
-}
-
-func createDefaultFile() *File {
-	pieceChan := make(chan interface{})
-	b := bitfield.NewBitfield(64)
-	f := NewFile(pieceChan, b)
-	return f
-}
-
-func sendPiecesToFile(bf *bitfield.Bitfield, ch chan interface{}) {
-
-	for {
-		for i := 0; i < bf.Pieces; i++ {
-			n := rand.Intn(bf.Pieces)
-			if n%4 == 0 {
-				i--
-			}
-
-			bf.SetPiece(i)
-			ch <- TestPiece{
-				index:  i,
-				length: 1,
-			}
-		}
-		_, gap := bf.LargestGap()
-		if gap == 0 {
-			fmt.Println(bf.Bitfield)
-			fmt.Println("breaking")
-			break
-		}
-	}
-
+	t.Errorf("TODO")
 }

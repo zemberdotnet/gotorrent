@@ -1,11 +1,11 @@
 package interfaces
 
+import "context"
+
 type Strategy interface {
 	// These are all communication features
-	Start()
+	Start(context.Context)
 	// These are properties on the strategy that help create work for it
-	Multipiece() bool
-	URL() bool
 }
 
 // switch to Download(Piece)

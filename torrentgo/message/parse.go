@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
-	"net"
 )
 
 // TODO Are go functions stored as pointers?
@@ -56,6 +55,7 @@ func (m *Message) ReadFrom(r io.Reader) (n int64, err error) {
 	return 0, nil
 }
 
+/*
 func (mp messageParser) ReadMessage(conn net.Conn) (*Message, error) {
 
 	msg, err := io.ReadAll(conn)
@@ -66,6 +66,7 @@ func (mp messageParser) ReadMessage(conn net.Conn) (*Message, error) {
 	return MessageParser.ParseMessage(msg)
 
 }
+*/
 
 // Parse Message takes in bytes, reads the messageID and calls the parsing function
 func (mp messageParser) ParseMessage(b []byte) (m *Message, err error) {

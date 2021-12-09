@@ -28,7 +28,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestClient(t *testing.T) {
-	filepath := "/home/snow/Projects/Coding/go/gotorrent/arch.torrent"
+	filepath := "/home/snow/Projects/Coding/go/gotorrent/debian.torrent"
 	c, err := New(filepath)
 	if err != nil {
 		t.Errorf("ERROR: %v", err)

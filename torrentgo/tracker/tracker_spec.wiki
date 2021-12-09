@@ -1,0 +1,9 @@
+=Tracker=
+==Service Based Design==
+	- Client will have called torrent() on the file by this point 
+	- Torrent returns relevant data from the torrent file to the client
+	- Client now calls tracker()
+
+==I/O==
+- In: Trackers main method should take in the *torrentFile struct
+- Out: Trackers main method should return the parsed tracker Response to the client

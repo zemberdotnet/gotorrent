@@ -1,10 +1,11 @@
 package tracker
 
 import (
+	"io"
+
 	bencode "github.com/jackpal/bencode-go"
 	"github.com/zemberdotnet/gotorrent/peer"
 	"github.com/zemberdotnet/gotorrent/torrent"
-	"io"
 
 	"errors"
 	"math/rand"
@@ -42,8 +43,14 @@ func (t *TrackerResponse) getPeers(url string) (*TrackerResponse, error) {
 	if err != nil {
 		return &TrackerResponse{}, err
 	}
-	defer resp.Body.Close()
-	return t.Read(resp.Body)
+	tResp, err := t.Read(resp.Body)
+	if err != nil {
+		resp.Body.Close()
+		return nil, err
+	}
+	resp.Body.Close()
+
+	return tResp, nil
 }
 
 // Format neutral to deal with bad responses from tracker
@@ -54,8 +61,10 @@ func (t *TrackerResponse) Read(r io.ReadCloser) (tResponse *TrackerResponse, e e
 		return t, err
 	}
 
-	t.Parsed, err = peer.ParsePeers(t.Peers)
+	t.Parsed, err = peer.ParseTorrPeers(t.Peers)
 	if err != nil {
+
+		return nil, err
 		// TODO Handle Error
 	}
 
