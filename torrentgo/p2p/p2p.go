@@ -2,7 +2,6 @@ package p2p
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"time"
 
@@ -31,39 +30,55 @@ func (p *P2P) Start(ctx context.Context) {
 	var conn *connection.PeerConn
 	var err error
 
-	// Do we need to defer connection close
+	// Loop until we get a good connection or we run out of peers:w
 	for {
 		conn, err = p.connPool.NextConnection()
 		if err != nil {
 			if err.Error() == "no remaining peers" {
 				return
+			} else if err.Error() == "no available connections" {
+				continue
 			}
-			log.Println(err)
 			continue
 		}
-
-		//defer p.connPool.ReturnConnection(conn)
 
 		// we initialize the connection
 		// complete the handshake
 		// and set the bitfield
 		err = conn.Initialize()
 		if err != nil {
+			p.connPool.RemoveConnection(conn)
 			continue
 		}
-		log.Println("FINISHED INIT")
+
+		// update the state so we can pick good pieces
+		p.state.IncrementCounts(conn.Bitfield)
+
+		err = conn.SendMessage(&message.Message{
+			MessageID: message.MsgUnchoke,
+		})
+		if err != nil {
+			log.Println(err)
+			p.state.DecrementCounts(conn.Bitfield)
+			conn.Conn.Close()
+			p.connPool.RemoveConnection(conn)
+			continue
+		}
+
+		err = conn.SendMessage(&message.Message{
+			MessageID: message.MsgInterested,
+		})
+		if err != nil {
+			log.Println(err)
+			p.state.DecrementCounts(conn.Bitfield)
+			conn.Conn.Close()
+			p.connPool.RemoveConnection(conn)
+			continue
+		}
+
 		break
 	}
 
-	// update the state
-	// this is more precarious than I would like
-	p.state.IncrementCounts(conn.Bitfield)
-
-	//
-	// c.Send(
-	//
-
-	// wait for work to come to us
 	for {
 		select {
 		case <-ctx.Done():
@@ -71,32 +86,31 @@ func (p *P2P) Start(ctx context.Context) {
 		default:
 			work, err := p.workCreator.WorkFromBitfield(conn.Bitfield, false)
 			if err != nil {
-				log.Println("Unable to get work")
+				log.Printf("Error getting work: %s", err)
 				return
 			}
 			err = p.DownloadPiece(conn, work[0])
 			if err != nil {
-				log.Printf("TODO: err %v", err)
+				log.Printf("Failed to download piece %v\n", work[0].Index())
+				p.workCreator.ReturnFailedWork(work[0])
+				// TODO we could have other errors so maybe don't always nuke the connection
+				p.connPool.RemoveConnection(conn)
 				return
 			}
 
 			if work[0].Verify() != nil {
-
+				log.Printf("Piece %d failed verification\n", work[0].Index())
+				p.workCreator.ReturnFailedWork(work[0])
 			}
+			p.outChan <- work[0]
 
-			// this is an interestin problem to understand
-			// calling this first garuntees we don't overflow
-			// the buffer
 		}
 	}
-
-	// need to initiate a new connection
 }
 
 // DownloadPiece attempts to downlad a torreent piece
 func (p *P2P) DownloadPiece(conn *connection.PeerConn, piece *piece.TorrPiece) (err error) {
 
-	fmt.Println("Downloading Piece")
 	// should move this onto an object so we
 	// can track the state
 	backlog := 0
@@ -126,21 +140,21 @@ func (p *P2P) DownloadPiece(conn *connection.PeerConn, piece *piece.TorrPiece) (
 				})
 
 				if err != nil {
+					log.Printf("Error sending request: %s\n", err)
 					return err
 				}
 
 				piece.Requested += p.maxBlocksize
-				backlog++
-			}
-
-			err = p.handleResponse(conn, piece)
-			if err != nil {
-				return err
+				conn.Backlog++
 			}
 
 		}
+		err = p.handleResponse(conn, piece)
+		if err != nil {
+			log.Printf("Error handling response: %s\n", err)
+			return err
+		}
 
-		fmt.Println("Finished Downloading Piece")
 	}
 	return nil
 }
@@ -149,6 +163,7 @@ func (p *P2P) handleResponse(conn *connection.PeerConn, piece *piece.TorrPiece) 
 
 	msg, err := message.ReadMessage(conn.Conn)
 	if err != nil {
+		log.Printf("Error reading message: %s\n", err)
 		return err
 	}
 
@@ -169,22 +184,20 @@ func (p *P2P) handleResponse(conn *connection.PeerConn, piece *piece.TorrPiece) 
 		// we are relying on not recieving bad input
 		conn.Bitfield.SetPiece(msg.Index)
 	case message.MsgBitfield:
-		log.Println("TODO CHECK THIS AGAINST SPEC")
 		conn.Bitfield = bitfield.NewBitfieldFromBytes(msg.Payload)
 	case message.MsgRequest:
 		// TODO
 	case message.MsgPiece:
-		log.Println("Getting a piece!")
 		n, err := piece.WriteAt(msg.Payload, msg.Begin)
 		if err != nil {
 			return err
 		}
+		conn.Backlog--
 
 		if n != len(msg.Payload) {
 			log.Printf("TODO: n %v len(msg.Payload) %v", n, len(msg.Payload))
 		}
 		piece.Downloaded += n
-		fmt.Printf("Downloaded %v", n)
 
 		return nil
 	case message.MsgCancel:
@@ -200,6 +213,20 @@ func (p *P2P) handleResponse(conn *connection.PeerConn, piece *piece.TorrPiece) 
 
 func (p *P2P) verifyPiece(piece *piece.TorrPiece) error {
 	return nil
+}
+
+func NewP2PFactory2(state *state.TorrentState, cp *connection.ConnectionPool, wc *work.WorkCreator, oc chan *piece.TorrPiece) func() *P2P {
+	return func() *P2P {
+		return &P2P{
+			state:       state,
+			connPool:    cp,
+			workCreator: wc,
+			outChan:     oc,
+			// TODO make this configurable
+			maxBacklog:   5,
+			maxBlocksize: 16384,
+		}
+	}
 }
 
 func NewP2PFactory(state *state.TorrentState, cp *connection.ConnectionPool, wc *work.WorkCreator, oc chan *piece.TorrPiece) func() interfaces.Strategy {

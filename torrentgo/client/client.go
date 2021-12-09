@@ -4,11 +4,11 @@ import (
 	"context"
 	"log"
 	"os"
-	"runtime"
 	"time"
 
 	"github.com/zemberdotnet/gotorrent/connection"
 	"github.com/zemberdotnet/gotorrent/coordinator"
+	"github.com/zemberdotnet/gotorrent/filebuilder"
 	"github.com/zemberdotnet/gotorrent/interfaces"
 	"github.com/zemberdotnet/gotorrent/p2p"
 	"github.com/zemberdotnet/gotorrent/peer"
@@ -34,6 +34,7 @@ func New(filepath string) (c *Client, e error) {
 	if err != nil {
 		log.Fatalf("Error: %v\n, Filepath: %v", err, filepath)
 	}
+	defer f.Close()
 
 	m, err := torrent.Unmarshal(f)
 	if err != nil {
@@ -57,17 +58,37 @@ func New(filepath string) (c *Client, e error) {
 
 func (c *Client) Coordinate() {
 
-	log.Println("GOMAXPROCS", runtime.GOMAXPROCS(1))
-	c.state = state.NewTorrentState(c.MetaInfo.Pieces(), c.MetaInfo.InfoHash)
+	c.state = state.NewTorrentState(c.MetaInfo.PieceLength(), c.MetaInfo.Length(), c.MetaInfo.Pieces(), c.MetaInfo.PieceHashes(), c.MetaInfo.InfoHash)
 
 	outChan := make(chan *piece.TorrPiece, 30)
 
 	coord := coordinator.NewCoordinator(c.state, c.CreateStrategyCreators(outChan))
-	ctx := context.Background()
-	go coord.Coordinate(ctx)
-	time.Sleep(time.Second * 10000)
-	ctx.Done()
+	ctx, cancel := context.WithCancel(context.Background())
+	/*
+		for _, peer := range c.Peers {
+			conn, err := net.DialTimeout("tcp", peer.String(), time.Second*2)
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+			conn.Close()
+			log.Println("Success!")
 
+		}
+	*/
+
+	fb := filebuilder.NewFileBuilder(c.MetaInfo.Pieces(), outChan)
+
+	go fb.Build(cancel, "./debian")
+	go coord.Coordinate(ctx)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			time.Sleep(time.Second * 3)
+		}
+	}
 }
 
 type CreateStrategyInput struct {

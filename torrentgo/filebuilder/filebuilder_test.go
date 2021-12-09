@@ -41,6 +41,10 @@ func (t TestPiece) Read(b []byte) (int, error) {
 	return 0, nil
 }
 
+func (t TestPiece) Verify() error {
+	return nil
+}
+
 func TestWriteToFile(t *testing.T) {
 	t.Errorf("TODO")
 }

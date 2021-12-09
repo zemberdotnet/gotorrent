@@ -22,11 +22,11 @@ type Piece interface {
 }
 
 var (
-	_ Piece = NewPiece(10, 0, 0, [20]byte{})
+	_ Piece = NewPiece(10, 0, 0, []byte{})
 )
 
 type TorrPiece struct {
-	piece      []byte
+	Piece      []byte
 	index      int
 	begin      int
 	length     int
@@ -36,15 +36,16 @@ type TorrPiece struct {
 	Count int
 	// for reading
 	pos  int
-	hash [20]byte
+	hash []byte
 }
 
-func NewPiece(size, index, begin int, hash [20]byte) *TorrPiece {
+func NewPiece(size, index, begin int, hash []byte) *TorrPiece {
 	return &TorrPiece{
-		piece: make([]byte, size),
-		index: index,
-		begin: begin,
-		hash:  hash,
+		Piece:  make([]byte, size),
+		length: size,
+		index:  index,
+		begin:  begin,
+		hash:   hash,
 	}
 }
 
@@ -61,7 +62,7 @@ func (p *TorrPiece) Length() int {
 }
 
 func (p *TorrPiece) Verify() error {
-	hash := sha1.Sum(p.piece)
+	hash := sha1.Sum(p.Piece)
 	if !bytes.Equal(hash[:], p.hash[:]) {
 		return errors.New("hash does not match")
 	}
@@ -78,32 +79,31 @@ if we want this to work when failing begin will need to move as it is written
 // This can be dangerous if the offset is incorrect
 // We do not count the empty bytes written to the piece
 func (p *TorrPiece) WriteAt(b []byte, off int) (n int, err error) {
-
 	if off < 0 {
 		return 0, errors.New("offset less than zero")
 	}
 
-	if p.piece == nil {
-		p.piece = make([]byte, len(b)+off)
-		n = copy(p.piece[off:], b[:])
-	} else if len(p.piece) < off {
-		diff := off - len(p.piece)
+	if p.Piece == nil {
+		p.Piece = make([]byte, len(b)+off)
+		n = copy(p.Piece[off:], b[:])
+	} else if len(p.Piece) < off {
+		diff := off - len(p.Piece)
 		// here we extend the array to handle the new bytes
-		p.piece = append(p.piece, make([]byte, diff)...)
-		n = copy(p.piece[off:], b[:])
+		p.Piece = append(p.Piece, make([]byte, diff)...)
+		n = copy(p.Piece[off:], b[:])
 	} else {
-		n = copy(p.piece[off:], b[:])
+		n = copy(p.Piece[off:], b[:])
 	}
-	return
+	return n, nil
 }
 
 // Write implments the io.Writer interface for Piece
 func (p *TorrPiece) Write(b []byte) (n int, err error) {
-	if p.piece == nil {
-		p.piece = make([]byte, len(b))
-		n = copy(p.piece[:], b[:])
+	if p.Piece == nil {
+		p.Piece = make([]byte, len(b))
+		n = copy(p.Piece[:], b[:])
 	} else {
-		p.piece = append(p.piece, b...)
+		p.Piece = append(p.Piece, b...)
 		n = len(b)
 	}
 	return
@@ -111,9 +111,9 @@ func (p *TorrPiece) Write(b []byte) (n int, err error) {
 
 // Read implements the io.Reader interface for Piece
 func (p *TorrPiece) Read(b []byte) (n int, err error) {
-	n = copy(b, p.piece[p.pos:])
+	n = copy(b, p.Piece[p.pos:])
 	p.pos += n
-	if p.pos == len(p.piece) {
+	if p.pos == len(p.Piece) {
 		return n, io.EOF
 	}
 	return

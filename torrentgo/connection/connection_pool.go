@@ -2,7 +2,6 @@ package connection
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 
 	"github.com/zemberdotnet/gotorrent/peer"
@@ -37,8 +36,6 @@ func (cp *ConnectionPool) ReturnConnection(conn *PeerConn) {
 	cp.lock.Lock()
 	defer cp.lock.Unlock()
 	if conn.Err != nil {
-		//TODO better error msg
-		fmt.Println(conn.Err)
 		return
 	}
 	cp.connections <- conn
@@ -69,19 +66,15 @@ func (cp *ConnectionPool) AddConnection(conn *PeerConn) bool {
 func (cp *ConnectionPool) NextConnection() (*PeerConn, error) {
 	cp.lock.Lock()
 	defer cp.lock.Unlock()
-
 	if len(cp.connections) > 0 { // if connections on queue
-		fmt.Println("pulling existing connection")
 		return <-cp.connections, nil
 	} else if cp.activeConns < cap(cp.connections) { // if more connections can be made
-		fmt.Println("making new connection")
 		if len(cp.Peers) < 1 {
 			return nil, errors.New("no remaining peers")
 		}
 		lastPeer := cp.Peers[len(cp.Peers)-1]
 		cp.Peers = cp.Peers[:len(cp.Peers)-1]
 		cp.activeConns++
-		fmt.Printf("New connection made with %v\n", lastPeer.String())
 
 		return cp.connFactory(lastPeer), nil
 

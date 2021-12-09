@@ -21,9 +21,10 @@ type PeerConn struct {
 	Choked     bool
 	Interested bool
 	Bitfield   bitfield.Bitfield
-	peer       peer.Peer
+	Peer       peer.Peer
 	infoHash   [20]byte
 	peerID     [20]byte
+	Backlog    int
 	Err        error
 }
 
@@ -38,42 +39,27 @@ func NewPeerConn(peer peer.Peer, infoHash, peerID [20]byte) *PeerConn {
 	return &PeerConn{
 		Conn:     nil,
 		Choked:   true,
-		peer:     peer,
+		Peer:     peer,
 		infoHash: infoHash,
 		peerID:   peerID,
 	}
 }
 
 func (p *PeerConn) Initialize() error {
-	fmt.Println("Initializing connection")
-	resolver := &net.Resolver{
-		PreferGo:     true,
-		StrictErrors: true,
-	}
-	dialer := net.Dialer{
-		Timeout:   time.Second * 60,
-		Deadline:  time.Time{},
-		LocalAddr: nil,
-		KeepAlive: 0,
-		Resolver:  resolver,
-	}
-
-	conn, err := dialer.Dial("tcp", p.peer.String())
-	//conn, err := net.DialTimeout("tcp", p.peer.String(), 2*time.Second)
-
+	log.Println("Initializing connection to peer:", p.Peer.String())
+	conn, err := net.DialTimeout("tcp", p.Peer.String(), 20*time.Second)
 	if err != nil {
 		log.Println("Error connecting to peer:", err)
 		p.Err = err
 		return err
 	}
-	conn.Close()
+	log.Println("Connected to peer:", p.Peer.String())
 	p.Conn = conn
-	fmt.Println("Connected to peer ", p.peer.String())
 
 	// we do not need the response at this time so have
 	_, err = p.Handshake()
 	if err != nil {
-		fmt.Println("error in intialize")
+		log.Println("Error handshaking with peer:", err)
 		p.Err = err
 		p.Conn.Close()
 		return err
@@ -81,7 +67,7 @@ func (p *PeerConn) Initialize() error {
 
 	err = p.SetBitfield()
 	if err != nil {
-		fmt.Println("error in intialize")
+		log.Println("Error setting bitfield:", err)
 		p.Err = err
 		p.Conn.Close()
 		return err
@@ -89,7 +75,6 @@ func (p *PeerConn) Initialize() error {
 
 	// TODO MORE MORE MORE
 
-	fmt.Println("Init is good")
 	return nil
 }
 
@@ -100,11 +85,14 @@ func (p *PeerConn) SetBitfield() error {
 
 	msg, err := message.ReadMessage(p.Conn)
 	if err != nil {
+		log.Println("Error reading message from peer:", err)
 		return err
 	}
+	log.Printf("Got Bitfield Message: Message Type: %s\n", msg.String())
 
 	if msg.MessageID != message.MsgBitfield {
-		err := fmt.Errorf("Expected bitfield message but got %d", msg.MessageID)
+		err := fmt.Errorf("expected bitfield message but got %d", msg.MessageID)
+		log.Println(err)
 		return err
 	}
 
@@ -124,7 +112,7 @@ func (p *PeerConn) Handshake() (*handshake.Handshake, error) {
 	hs := handshake.NewHandshake(p.infoHash, p.peerID)
 	_, err := hs.WriteTo(p.Conn)
 	if err != nil {
-		// TODO
+		log.Println("Error writing handshake to peer:", err)
 		return nil, err
 	}
 
@@ -132,6 +120,7 @@ func (p *PeerConn) Handshake() (*handshake.Handshake, error) {
 	resp := handshake.NewEmptyHandshake()
 	_, err = resp.ReadFrom(p.Conn)
 	if err != nil {
+		log.Println("Error reading handshake from peer:", err)
 		// TODO
 		return nil, err
 	}

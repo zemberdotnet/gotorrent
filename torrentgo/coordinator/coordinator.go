@@ -2,7 +2,6 @@ package coordinator
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -22,7 +21,7 @@ type Coordinator struct {
 
 func NewCoordinator(state *state.TorrentState, creators []func() interfaces.Strategy) *Coordinator {
 	// TODO make this configurable
-	max := 3
+	max := 30
 
 	return &Coordinator{
 		strats: struct {
@@ -43,12 +42,10 @@ func NewCoordinator(state *state.TorrentState, creators []func() interfaces.Stra
 func (c *Coordinator) Coordinate(ctx context.Context) {
 	count := 0
 	wg := sync.WaitGroup{}
-	sleepDuration := 100 * time.Millisecond
+	sleepDuration := 25 * time.Millisecond
 	// create strategies
 	go func() {
 		for {
-
-			time.Sleep(sleepDuration)
 			select {
 			case <-ctx.Done():
 				wg.Done()
@@ -57,7 +54,6 @@ func (c *Coordinator) Coordinate(ctx context.Context) {
 				// if we have less strats going than allowed then start more
 				if c.strats.total < c.strats.max {
 					count++
-					fmt.Println(count)
 					// if the next pointer on strats is less than the legnth
 					// use it to start otherwise take the pointer back to zero
 					// and iterate through the strats again
@@ -74,7 +70,7 @@ func (c *Coordinator) Coordinate(ctx context.Context) {
 						c.strats.next++
 					}
 				} else {
-					return
+					time.Sleep(sleepDuration)
 				}
 			}
 		}

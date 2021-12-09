@@ -7,22 +7,27 @@ import (
 )
 
 type TorrentState struct {
-	Length    int
-	InfoHash  [20]byte
-	counts    []int
-	finished  int
-	inProcess int
-	lock      *sync.RWMutex
+	PieceLength int
+	Length      int
+	PieceHashes [][]byte
+	InfoHash    [20]byte
+	counts      []int
+	finished    int
+	inProcess   int
+	lock        *sync.RWMutex
 }
 
-func NewTorrentState(length int, infoHash [20]byte) *TorrentState {
+// TODO
+func NewTorrentState(pieceLength, length int, pieces int, pieceHashes [][]byte, infoHash [20]byte) *TorrentState {
 	return &TorrentState{
-		Length:    length,
-		InfoHash:  infoHash,
-		counts:    make([]int, length),
-		finished:  0,
-		inProcess: 0,
-		lock:      &sync.RWMutex{},
+		PieceLength: pieceLength,
+		PieceHashes: pieceHashes,
+		Length:      length,
+		InfoHash:    infoHash,
+		counts:      make([]int, pieces),
+		finished:    0,
+		inProcess:   0,
+		lock:        &sync.RWMutex{},
 	}
 }
 
@@ -49,7 +54,7 @@ func (ts *TorrentState) InProcess() int {
 // still would be good practice
 func (ts *TorrentState) GetCount(index int) int {
 	ts.lock.RLock()
-	defer ts.lock.Unlock()
+	defer ts.lock.RUnlock()
 	return ts.counts[index]
 }
 

@@ -39,7 +39,8 @@ func (wc *WorkCreator) WorkFromBitfield(b bitfield.Bitfield, multipiece bool) ([
 
 func (wc *WorkCreator) createSinglePieceWork(b bitfield.Bitfield) ([]*piece.TorrPiece, error) {
 	p := -1
-	min_piece := 100000000
+	// max int
+	min_piece := int(^uint(0) >> 1)
 
 	for i := 0; i < len(b)*8; i++ {
 		if b.HasPiece(i) && wc.state.GetCount(i) < min_piece && wc.inProgress[i] == 0 {
@@ -54,7 +55,18 @@ func (wc *WorkCreator) createSinglePieceWork(b bitfield.Bitfield) ([]*piece.Torr
 	}
 	wc.inProgress[p] = 1
 
-	return nil, errors.New("Not implemented")
+	workPiece := piece.NewPiece(wc.calcPieceLength(p), p, 0, wc.state.PieceHashes[p])
+	return []*piece.TorrPiece{workPiece}, nil
+
+}
+
+func (wc *WorkCreator) calcPieceLength(p int) int {
+	// if the piece is the last piece it might not be full sized
+	if p*wc.state.PieceLength+wc.state.PieceLength > wc.state.Length {
+		return wc.state.Length - p*wc.state.PieceLength
+	}
+	// otherwise it is a normal sized piece
+	return wc.state.PieceLength
 }
 
 func (wc *WorkCreator) createMultiPieceWork(b bitfield.Bitfield) ([]Work, error) {
